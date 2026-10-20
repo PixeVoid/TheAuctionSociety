@@ -85,16 +85,16 @@
         Engineered by: <strong>Ankit Anand</strong> (UID: 2025800005) & <strong>Aryaman Annavajhala</strong> (UID: 2025800006)
       </p>
       <p style="font-family: 'Space Grotesk', sans-serif; font-size: 15px; color: #444; max-width: 880px; margin-top: 10px; line-height: 1.6;">
-        Relational Database Management Systems Mini-Project Case Study. Built on MySQL 8.0+ (InnoDB) with strict 3NF schema normalization, multi-table foreign key constraints, automated validation triggers, and serializable ACID transactions to eliminate race conditions in high-concurrency auctions.
+        Relational Database Management Systems Mini-Project Case Study. Aligned strictly with the SPIT DBMS Laboratory curriculum (Experiments 1 to 5): 3NF schema design with integrity constraints (Exp-1), DML transactional operations (Exp-2), comparison & arithmetic operators (Exp-3), Joins, Aggregate Functions, GROUP BY, HAVING & Nested Subqueries (Exp-4), and Views & Triggers (Exp-5).
       </p>
     </div>
 
     <!-- Architecture Tabs -->
     <div class="arch-tabs">
-      <button type="button" class="arch-tab-btn is-active" data-arch-tab="schema">3NF Relational Schema</button>
-      <button type="button" class="arch-tab-btn" data-arch-tab="triggers">SQL Triggers & Procedures</button>
-      <button type="button" class="arch-tab-btn" data-arch-tab="acid">ACID & Concurrency (MVCC)</button>
-      <button type="button" class="arch-tab-btn" data-arch-tab="views">Analytical Views</button>
+      <button type="button" class="arch-tab-btn is-active" data-arch-tab="schema">Exp-1: 3NF Relational Schema</button>
+      <button type="button" class="arch-tab-btn" data-arch-tab="triggers">Exp-5: SQL Triggers</button>
+      <button type="button" class="arch-tab-btn" data-arch-tab="acid">ACID & Transactions</button>
+      <button type="button" class="arch-tab-btn" data-arch-tab="views">Exp-4 & 5: Joins, Views & Queries</button>
     </div>
 
     <!-- Dynamic Tab Content Render Target -->
@@ -128,8 +128,8 @@
 <!-- ========================================================
      ARCHITECTURE DETAIL & SQL DDL MODAL
      ======================================================== -->
-<div id="arch-detail-modal" class="crt-modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
-  <div class="crt-modal-window arch-modal-window">
+<div id="arch-detail-modal" class="crt-modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true" data-lenis-prevent="true">
+  <div class="crt-modal-window arch-modal-window" data-lenis-prevent="true">
     <div class="crt-window-titlebar">
       <div class="crt-titlebar-left">
         <img src="assets/06.png" alt="" class="crt-titlebar-star" />
@@ -137,7 +137,7 @@
       </div>
       <button class="crt-window-close" id="arch-modal-close" aria-label="Close modal">✕</button>
     </div>
-    <div class="arch-modal-body" id="arch-modal-body">
+    <div class="arch-modal-body" id="arch-modal-body" data-lenis-prevent="true">
       <!-- Dynamic detailed content -->
     </div>
   </div>

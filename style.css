@@ -11612,17 +11612,33 @@ LIST CURSOR FOLLOW
 }
 
 /* Architecture Inspection Modal */
+body.modal-open {
+  overflow: hidden !important;
+  height: 100vh !important;
+  touch-action: none;
+}
+
+.crt-modal-backdrop {
+  overscroll-behavior: contain !important;
+}
+
 .arch-modal-window {
   max-width: 940px;
   width: 94vw;
   max-height: 88vh;
   display: flex;
   flex-direction: column;
+  overflow: hidden !important;
 }
 
 .arch-modal-body {
   padding: 24px 28px;
-  overflow-y: auto;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: scroll !important;
+  overscroll-behavior: contain !important;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y !important;
   font-family: 'Space Grotesk', -apple-system, sans-serif;
   color: #1a1a1a;
   line-height: 1.6;

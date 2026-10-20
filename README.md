@@ -77,10 +77,11 @@ http://localhost:3000
                       CORE DATA LAYER (In-Memory -> MySQL 8.0 DDL)
 ========================================================================================
   ┌──────────────────────────────────────────────────────────────────────────────────┐
-  │  9 Relational 3NF Entities:                                                      │
-  │  users ──< auctions ──< lots ──< bids ──< payments                               │
-  │     │           │                                                                │
-  │     └──< watchlists                     audit_logs & admin_actions               │
+  │  8 Relational 3NF Entities (SPIT Exp-1 DDL with Integrity Constraints):          │
+  │  users ──< item ──< auction ──< bid ──< payment                                  │
+  │     │       │          │                                                         │
+  │     │   category   watchlist                                  audit_log          │
+  │     └─────────────────────────────────────────────────────────────┘              │
   └──────────────────────────────────────────────────────────────────────────────────┘
 ```
 
@@ -92,7 +93,7 @@ http://localhost:3000
 |---|---|---|---|
 | **`index.html`** | Editorial landing & brand showcase | `GET /api/auctions` | Fetches active lots for the featured lots teaser slider. |
 | **`catalog.html`** | Transactional browsing & bidding | `GET /api/categories`<br>`GET /api/auctions`<br>`POST /api/auctions/:id/bid`<br>`POST /api/auctions/:id/watchlist` | - Filters/sorts auctions in real-time.<br>- Submits atomic bids (checks minimum increment & self-bid).<br>- Toggles saved lots to member watchlist. |
-| **`architecture.html`** | Academic DBMS showcase | *Static / Informational* | Demonstrates the 9-table schema, SQL triggers, normalization, and ACID concurrency engine to professors. |
+| **`architecture.html`** | Academic DBMS showcase | *Static / Informational* | Demonstrates the 8-table schema (Exp-1), SQL triggers (Exp-5), Joins/Views/Subqueries (Exp-4), 3NF normalization, and ACID concurrency engine to professors. |
 | **`system-log.html`** | Admin desk & audit ledger | `GET /api/admin/dashboard`<br>`POST /api/admin/categories`<br>`PATCH /api/admin/users/:id/status`<br>`POST /api/admin/auctions/:id/cancel` | - Streams live audit history.<br>- Adds/renames auction categories.<br>- Blocks/unblocks fraudulent users.<br>- Forces emergency auction cancellations. |
 | **`account.html`** | Member login, register & dashboard | `POST /api/auth/register`<br>`POST /api/auth/login`<br>`POST /api/auth/logout`<br>`GET /api/me`<br>`GET /api/dashboard`<br>`POST /api/listings`<br>`POST /api/auctions/:id/payment` | - Registers new users as Buyer, Seller, or Both.<br>- Logs in and receives secure session cookie.<br>- Displays user's active bids, won lots, and watchlist.<br>- Allows sellers to create new auction listings.<br>- Simulates 48-hour payment settlement for winners. |
 
@@ -166,7 +167,7 @@ http://localhost:3000
 
 ### Q5: "Where are the team members credited and how is academic DBMS represented?"
 > **Answer**:  
-> Architects **Ankit Anand** (`2025800005`) and **Aryaman Annavajhala** (`2025800006`) are showcased on the home page ([index.html](file:///home/void/Documents/antigravity/bold-heisenberg/index.html)) with pixel-art hover cards. The dedicated [architecture.html](file:///home/void/Documents/antigravity/bold-heisenberg/architecture.html) page details the 9-entity relational schema, 3NF normalization proofs, SQL triggers (`trg_bid_validate`, `trg_bid_audit`), and ACID compliance model.
+> Architects **Ankit Anand** (`2025800005`) and **Aryaman Annavajhala** (`2025800006`) are showcased on the home page ([index.html](file:///home/void/Documents/antigravity/bold-heisenberg/index.html)) with pixel-art hover cards. The dedicated [architecture.html](file:///home/void/Documents/antigravity/bold-heisenberg/architecture.html) page details the 8-entity relational schema (Exp-1), 3NF normalization proofs, SQL triggers (Exp-5: `trg_bid_validate`, `trg_bid_audit`), analytical views & subqueries (Exp-4), and ACID compliance model.
 
 ---
 
