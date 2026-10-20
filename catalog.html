@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>The Catalog — The Auction Society (High-Concurrency DBMS Auction Engine)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Pixelify+Sans&family=Space+Grotesk:wght@300;400;500;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/lenis@1.3.17/dist/lenis.css">
+
+<link rel="preload" href="fonts/SpaceGrotesk-Regular.otf" as="font" type="font/otf" crossorigin>
+<link rel="preload" href="fonts/SpaceGrotesk-Medium.otf" as="font" type="font/otf" crossorigin>
+<link rel="preload" href="fonts/FKRasterRomanCompact-Smooth.ttf" as="font" type="font/ttf" crossorigin>
+<link rel="preload" href="fonts/KHTekaTRIAL-Regular.otf" as="font" type="font/otf" crossorigin>
+<link rel="preload" href="fonts/KHInterferenceTRIAL-Regular.otf" as="font" type="font/otf" crossorigin>
+<link rel="stylesheet" href="style.css">
+<style>html:not(.tds-loader-off) [data-load-wrap]{display:block}html:not(.tds-loader-off) [data-load-text]{visibility:hidden}</style>
+<script>setTimeout(function(){document.documentElement.classList.add("tds-loader-off")},1000)</script>
+</head>
+<body data-crt="true" class="body">
+
+<!-- ========================================================
+     EXTENDING TWO-STEP NAVIGATION (Reference: media_1792462545944_99f6d342.png)
+     ======================================================== -->
+<nav data-twostep-nav="" data-nav-status="not-active" class="twostep-nav">
+  <div data-nav-toggle="close" class="twostep-nav__bg"></div>
+  <div class="twostep-nav__wrap">
+    <div class="twostep-nav__width">
+      <div class="twostep-nav__bar">
+        <div class="twostep-nav__back"><div class="twostep-nav__back-bg"></div></div>
+        <div class="twostep-nav__top">
+          <a href="index.html" aria-current="page" class="twostep-nav__logo w-inline-block w--current"><div class="twostep-nav__logo-icon"><svg viewBox="0 0 800 800" width="28" height="28" fill="none" xmlns="http://www.w3.org/2000/svg" style="display:block"><path d="M400 450C372.386 450 350 427.614 350 400C350 372.386 372.386 350 400 350C427.614 350 450 372.386 450 400C450 427.614 427.614 450 400 450ZM450 76V24C450 10.7452 439.255 0 426 0H374C360.745 0 350 10.7452 350 24V76C350 89.2548 360.745 100 374 100H426C439.255 100 450 89.2548 450 76ZM450 776V724C450 710.745 439.255 700 426 700H374C360.745 700 350 710.745 350 724V776C350 789.255 360.745 800 374 800H426C439.255 800 450 789.255 450 776ZM800 426V374C800 360.745 789.255 350 776 350H724C710.745 350 700 360.745 700 374V426C700 439.255 710.745 450 724 450H776C789.255 450 800 439.255 800 426ZM100 426V374C100 360.745 89.2548 350 76 350H24C10.7452 350 0 360.745 0 374V426C0 439.255 10.7452 450 24 450H76C89.2548 450 100 439.255 100 426ZM550 300C550 327.614 572.386 350 600 350H626C639.255 350 650 360.745 650 374V426C650 439.255 639.255 450 626 450H600C572.386 450 550 472.386 550 500C550 527.614 572.386 550 600 550H626C639.255 550 650 560.745 650 574V626C650 639.255 639.255 650 626 650H574C560.745 650 550 639.255 550 626V600C550 572.386 527.614 550 500 550C472.386 550 450 572.386 450 600V626C450 639.255 439.255 650 426 650H374C360.745 650 350 639.255 350 626V600C350 572.386 327.614 550 300 550C272.386 550 250 572.386 250 600V626C250 639.255 239.255 650 226 650H174C160.745 650 150 639.255 150 626V574C150 560.745 160.745 550 174 550H200C227.614 550 250 527.614 250 500C250 472.386 227.614 450 200 450H174C160.745 450 150 439.255 150 426V374C150 360.745 160.745 350 174 350H200C227.614 350 250 327.614 250 300C250 272.386 227.614 250 200 250H174C160.745 250 150 239.255 150 226V174C150 160.745 160.745 150 174 150H226C239.255 150 250 160.745 250 174V200C250 227.614 272.386 250 300 250C327.614 250 350 227.614 350 200V174C350 160.745 360.745 150 374 150H426C439.255 150 450 160.745 450 174V200C450 227.614 472.386 250 500 250C527.614 250 550 227.614 550 200V174C550 160.745 560.745 150 574 150H626C639.255 150 650 160.745 650 174V226C650 239.255 639.255 250 626 250H600C572.386 250 550 272.386 550 300ZM500 450C527.614 450 550 427.614 550 400C550 372.386 527.614 350 500 350H474C460.745 350 450 339.255 450 326V300C450 272.386 427.614 250 400 250C372.386 250 350 272.386 350 300V326C350 339.255 339.255 350 326 350H300C272.386 350 250 372.386 250 400C250 427.614 272.386 450 300 450H326C339.255 450 350 460.745 350 474V500C350 527.614 372.386 550 400 550C427.614 550 450 527.614 450 500V474C450 460.745 460.745 450 474 450H500Z" fill="#350AFF"/></svg></div><span class="twostep-nav__logo-title">The Auction Society</span></a>
+          <button data-nav-toggle="toggle" class="twostep-nav__toggle" aria-label="Toggle navigation">
+            <div class="twostep-nav__toggle-bar"></div>
+            <div class="twostep-nav__toggle-bar"></div>
+          </button>
+          <div class="twostep-nav__top-line"></div>
+        </div>
+        <div class="twostep-nav__bottom">
+          <div class="twostep-nav__bottom-overflow">
+            <div class="twostep-nav__bottom-inner">
+              <div class="twostep-nav__bottom-row">
+                <div class="twostep-nav__bottom-col">
+                  <div class="twostep-nav__info">
+                    <ul class="twostep-nav__ul">
+                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="catalog.html" aria-current="page" class="twostep-nav__link w-inline-block w--current"><span data-scramble-hover="target" class="twostep-nav__link-span">CATALOG</span></a></li>
+                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="catalog.html" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-span">AUCTIONS</span></a></li>
+                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="architecture.html" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-span">DBMS ARCHITECTURE</span></a></li>
+                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="system-log.html" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-span">SYSTEM LOG</span></a></li>
+                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="account.html" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-span">ACCOUNT</span></a></li>
+                    </ul>
+                    <ul class="twostep-nav__ul is--small">
+                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="architecture.html#schema" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-eyebrow">Schema</span></a></li>
+                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="architecture.html#acid" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-eyebrow">ACID Engine</span></a></li>
+                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="https://github.com" target="_blank" rel="noopener noreferrer" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-eyebrow">GitHub</span></a></li>
+                    </ul>
+                  </div>
+                </div>
+                <div class="twostep-nav__bottom-col is--visual">
+                  <div class="twostep-nav__visual" style="background-color: #BCF015; display: flex; align-items: center; justify-content: center; padding: 2rem; border-radius: 8px;">
+                    <img src="assets/09.png" alt="The Auction Society Eye Crest" style="width: 100%; max-width: 200px; height: auto; object-fit: contain; image-rendering: pixelated;" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</nav>
+
+<!-- ========================================================
+     TRANSACTIONAL CATALOG SECTION (Dedicated Tab View)
+     ======================================================== -->
+<main class="main-content">
+  <section class="catalog-section" style="margin-top: 130px; margin-bottom: 90px;">
+    <div class="catalog-header-wrap">
+      <div class="title-h2">
+        <div class="hero-card-title">
+          <div class="dot blue"></div>
+          <div class="hero-card-caption">TRANSACTIONAL CATALOG</div>
+        </div>
+        <div class="title-h2-text">Real-time auction lots governed by ACID protocols.</div>
+      </div>
+      <div class="catalog-controls">
+        <div class="catalog-search-wrap">
+          <svg class="search-icon" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="11" cy="11" r="8"></circle><line x1="21" y1="21" x2="16.65" y2="16.65"></line>
+          </svg>
+          <input type="text" id="catalog-search-input" class="catalog-search-input" placeholder="Search lots by keyword, condition, or seller..." />
+        </div>
+        <div class="catalog-sort-wrap">
+          <label for="catalog-sort-select" class="sort-label">SORT:</label>
+          <select id="catalog-sort-select" class="catalog-sort-select">
+            <option value="ending_soon">Ending Soonest</option>
+            <option value="bid_desc">Highest Bid (₹)</option>
+            <option value="bid_asc">Lowest Bid (₹)</option>
+          </select>
+        </div>
+      </div>
+      <div class="catalog-pills" id="catalog-category-pills">
+        <button type="button" class="category-pill is-active" data-category="">All Lots</button>
+      </div>
+    </div>
+    <div class="catalog-grid" id="catalog-grid">
+      <div class="catalog-loading-state">Synchronizing live auctions from MySQL transaction ledger...</div>
+    </div>
+  </section>
+</main>
+
+<!-- ========================================================
+     LOT DETAIL & LIVE BIDDING MODAL
+     ======================================================== -->
+<div id="lot-bid-modal" class="crt-modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="crt-modal-window lot-modal-window">
+    <div class="crt-window-titlebar">
+      <div class="crt-titlebar-left">
+        <img src="assets/06.png" alt="" class="crt-titlebar-star" />
+        <span class="crt-titlebar-title" id="lot-modal-header-title">Lot Details</span>
+      </div>
+      <button class="crt-window-close" id="lot-modal-close" aria-label="Close lot details">✕</button>
+    </div>
+    <div class="lot-modal-body">
+      <div class="lot-modal-left">
+        <div class="lot-modal-img-wrap">
+          <img id="lot-modal-img" src="" alt="Lot Image" class="lot-modal-img" />
+          <div class="lot-modal-badges">
+            <span id="lot-modal-badge-lot" class="badge-square green">LOT #000</span>
+            <span id="lot-modal-badge-cat" class="badge-round green">Category</span>
+            <span id="lot-modal-badge-cond" class="badge-square green">Condition</span>
+          </div>
+        </div>
+        <div class="lot-modal-meta">
+          <div class="lot-meta-row"><strong>Seller:</strong> <span id="lot-modal-seller">--</span></div>
+          <div class="lot-meta-row"><strong>Location:</strong> <span id="lot-modal-location">--</span></div>
+          <div class="lot-meta-row"><strong>Reserve:</strong> <span id="lot-modal-reserve-status" class="reserve-status-tag">Evaluating...</span></div>
+        </div>
+        <p id="lot-modal-desc" class="lot-modal-description">--</p>
+      </div>
+      <div class="lot-modal-right">
+        <div class="bid-status-card">
+          <div class="bid-status-label">CURRENT HIGH BID</div>
+          <div class="bid-status-amount" id="lot-modal-current-bid">₹0</div>
+          <div class="bid-status-sub" id="lot-modal-bid-sub">0 bids · Ends in <span id="lot-modal-timer">--</span></div>
+        </div>
+
+        <form id="lot-bid-form" class="lot-bid-form">
+          <label for="lot-bid-input" class="bid-form-label">
+            YOUR BID AMOUNT (INR ₹)
+            <span class="bid-min-hint" id="lot-bid-min-hint">Min: ₹0</span>
+          </label>
+          <div class="bid-input-group">
+            <span class="currency-prefix">₹</span>
+            <input type="number" id="lot-bid-input" class="bid-input" placeholder="Enter bid..." required min="1" step="1" />
+          </div>
+          <div class="quick-bid-buttons" id="quick-bid-pills">
+            <!-- Rendered dynamically e.g. +500, +1000, +5000 -->
+          </div>
+          <button type="submit" class="btn-submit-bid" id="btn-submit-bid">Submit Bid (SQL Transaction)</button>
+        </form>
+
+        <div class="bid-history-wrap">
+          <div class="bid-history-title">RECENT TRANSACTION LOG</div>
+          <div class="bid-history-list" id="lot-bid-history-list">
+            <!-- Live bid rows -->
+          </div>
+        </div>
+
+        <div class="lot-actions-footer">
+          <button type="button" class="btn-toggle-watchlist" id="btn-modal-watchlist">
+            <span id="modal-watchlist-heart">🤍</span>
+            <span id="modal-watchlist-text">Save to Watchlist</span>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========================================================
+     ACADEMIC & FOOTER STRIP
+     ======================================================== -->
+<footer class="footer" style="position: relative; z-index: 10;">
+  <div class="footer-marquee">
+    <div class="marquee-css-2">
+      <div class="marquee-css__list">
+        <div class="marquee-css__item-2">
+          <p class="marquee-css__item-p-2">THE AUCTION SOCIETY ✦ REAL-TIME ACID BID TRANSACTIONS ✦ SERIALIZABLE ISOLATION ✦ SPIT MUMBAI ✦ ANKIT ANAND & AYAMAN ANNAVAJHALA ✦</p>
+          <p class="marquee-css__item-p-2 etoile">✦</p>
+        </div>
+        <div class="marquee-css__item-2">
+          <p class="marquee-css__item-p-2">THE AUCTION SOCIETY ✦ REAL-TIME ACID BID TRANSACTIONS ✦ SERIALIZABLE ISOLATION ✦ SPIT MUMBAI ✦ ANKIT ANAND & AYAMAN ANNAVAJHALA ✦</p>
+          <p class="marquee-css__item-p-2 etoile">✦</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</footer>
+
+<svg class="crt-svg-defs" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="crt-chroma" x="0%" y="0%" width="100%" height="100%">
+      <feOffset in="SourceGraphic" dx="-0.8" dy="0" result="r"/>
+      <feColorMatrix in="r" type="matrix" values="1 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 1 0" result="rOnly"/>
+      <feOffset in="SourceGraphic" dx="0.8" dy="0" result="b"/>
+      <feColorMatrix in="b" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 1 0 0  0 0 0 1 0" result="bOnly"/>
+      <feColorMatrix in="SourceGraphic" type="matrix" values="0 0 0 0 0  0 1 0 0 0  0 0 0 0 0  0 0 0 1 0" result="gOnly"/>
+      <feBlend in="rOnly" in2="gOnly" mode="screen" result="rg"/>
+      <feBlend in="rg" in2="bOnly" mode="screen"/>
+    </filter>
+  </defs>
+</svg>
+
+<div class="crt-grain"></div>
+<div class="crt-scanlines"></div>
+<div class="crt-glare"></div>
+<div class="crt-vignette"></div>
+<div class="crt-bezel"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/lenis@1.3.17/dist/lenis.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrollTrigger.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/SplitText.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/CustomEase.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrambleTextPlugin.min.js"></script>
+<script src="script.js"></script>
+
+<div id="toast-container" class="toast-container" aria-live="polite"></div>
+
+</body>
+</html>

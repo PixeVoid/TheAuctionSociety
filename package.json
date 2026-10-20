@@ -1,0 +1,9 @@
+{
+  "name": "online-auction-system",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Online auction system mini project",
+  "scripts": {
+    "start": "node server.js"
+  }
+}
