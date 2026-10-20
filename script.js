@@ -277,7 +277,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
   }
 
   // 3. Lot Detail & Live Bidding Drawer
-  async function openLotModal(lotId) {
+  async function openLotModal(lotId, successMessage = null) {
     try {
       const res = await fetch(`/api/auctions/${lotId}`);
       if (!res.ok) {
@@ -315,8 +315,10 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
 
       const isClosed = lot.status === 'Closed' || Date.now() >= lot.endsAt;
       const timeLeft = isClosed ? 'Closed' : formatCountdown(lot.endsAt - Date.now());
-      document.getElementById('lot-modal-bid-sub').textContent = `${lot.bidCount || 0} bids · Min Increment: ${formatINR(lot.minIncrement)}`;
-      document.getElementById('lot-modal-timer').textContent = timeLeft;
+      const subEl = document.getElementById('lot-modal-bid-sub');
+      if (subEl) subEl.textContent = `${lot.bidCount || 0} bids · Min Increment: ${formatINR(lot.minIncrement)}`;
+      const timerEl = document.getElementById('lot-modal-timer');
+      if (timerEl) timerEl.textContent = timeLeft;
 
       // Watchlist toggle state
       const watchBtn = document.getElementById('lot-modal-watchlist-btn');
@@ -366,8 +368,13 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
 
       const feedback = document.getElementById('bid-form-feedback');
       if (feedback) {
-        feedback.textContent = '';
-        feedback.className = 'bid-form-feedback';
+        if (successMessage) {
+          feedback.className = 'bid-form-feedback success';
+          feedback.textContent = successMessage;
+        } else {
+          feedback.textContent = '';
+          feedback.className = 'bid-form-feedback';
+        }
       }
 
       openModal('lot-bid-modal');
@@ -427,12 +434,11 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
         return;
       }
 
-      feedback.className = 'bid-form-feedback success';
-      feedback.textContent = `✓ Bid accepted at ${formatINR(amount)}! High bidder recorded.`;
+      const successMsg = `✓ Bid accepted at ${formatINR(amount)}! High bidder recorded.`;
       showToast(`🎉 Bid of ${formatINR(amount)} recorded in SQL ledger!`, 'success');
 
-      // Refresh data
-      openLotModal(state.activeLot.id);
+      // Refresh data while keeping success message in modal
+      await openLotModal(state.activeLot.id, successMsg);
       loadAuctions();
     } catch (err) {
       feedback.className = 'bid-form-feedback error';
@@ -691,7 +697,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
             <div class="form-group">
               <label>Category</label>
               <select id="listing-category" class="catalog-sort-select">
-                ${state.categories.map(c => `<option value="${c.name}">${c.name}</option>`).join('')}
+                ${state.categories.map(c => `<option value="${escapeHtml(c.name)}">${escapeHtml(c.name)}</option>`).join('')}
               </select>
             </div>
             <div class="form-group">
@@ -721,9 +727,21 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
               <input type="number" id="listing-reserve" class="auth-input" required min="100" value="6500" />
             </div>
           </div>
-          <div class="form-group">
-            <label>Location</label>
-            <input type="text" id="listing-location" class="auth-input" required value="Mumbai, Maharashtra" />
+          <div style="display:grid; grid-template-columns: 1fr 1fr; gap:12px;">
+            <div class="form-group">
+              <label>Location</label>
+              <input type="text" id="listing-location" class="auth-input" required value="Mumbai, Maharashtra" />
+            </div>
+            <div class="form-group">
+              <label>Auction Duration</label>
+              <select id="listing-duration" class="catalog-sort-select">
+                <option value="1">1 Day (Quick Auction)</option>
+                <option value="3">3 Days</option>
+                <option value="7" selected>7 Days (Standard)</option>
+                <option value="14">14 Days</option>
+                <option value="30">30 Days (Maximum)</option>
+              </select>
+            </div>
           </div>
           <div class="form-group">
             <label>Image URL</label>
@@ -742,6 +760,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
 
   async function handleCreateListing(e) {
     e.preventDefault();
+    const durationDays = Number(document.getElementById('listing-duration')?.value || 7);
     const payload = {
       title: document.getElementById('listing-title').value.trim(),
       category: document.getElementById('listing-category').value,
@@ -749,7 +768,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
       startingPrice: Number(document.getElementById('listing-start-price').value),
       minIncrement: Number(document.getElementById('listing-increment').value),
       reservePrice: Number(document.getElementById('listing-reserve').value),
-      endDate: new Date(Date.now() + 7 * 86400000).toISOString(),
+      endDate: new Date(Date.now() + durationDays * 86400000).toISOString(),
       location: document.getElementById('listing-location').value.trim(),
       image: document.getElementById('listing-image').value.trim(),
       description: document.getElementById('listing-description').value.trim()

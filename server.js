@@ -27,20 +27,21 @@ const MIME = {
 
 // In-memory repository for the website phase. The MySQL phase will replace this layer.
 const categories = [
-  { id: 1, name: 'Cameras', description: 'Film and digital cameras, lenses, and accessories' },
-  { id: 2, name: 'Furniture', description: 'Furniture and useful objects for the home' },
-  { id: 3, name: 'Watches', description: 'Mechanical and everyday watches' },
-  { id: 4, name: 'Books', description: 'Books, prints, and paper goods' },
-  { id: 5, name: 'Collectibles', description: 'Objects with history and character' }
+  { id: 1, name: 'Fine Watches', description: 'Horological masterworks and vintage chronometers' },
+  { id: 2, name: 'Rare Collectibles', description: 'Fine art, sculptures, and rare museum-grade artifacts' },
+  { id: 3, name: 'Vehicles', description: 'High-performance and collector automobiles' },
+  { id: 4, name: 'Cameras', description: 'Film and digital cameras, lenses, and accessories' },
+  { id: 5, name: 'Furniture', description: 'Furniture and useful objects for the home' },
+  { id: 6, name: 'Books', description: 'Books, prints, and paper goods' }
 ];
 const now = Date.now();
 const auctions = [
-  { id: 1, title: 'Vintage 35mm rangefinder camera', category: 'Cameras', condition: 'Excellent', currentBid: 6200, startingPrice: 4500, reservePrice: 5000, minIncrement: 100, bidCount: 18, endsAt: now + 5 * 3600000 + 23 * 60000, status: 'Active', seller: 'Rohan Mehta', ownerId: null, location: 'Mumbai, Maharashtra', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=85', description: 'A well-kept film camera with a bright viewfinder and smooth mechanical action. Includes body cap, strap, and original leather case.' },
-  { id: 2, title: 'Refurbished teak study table', category: 'Furniture', condition: 'Good', currentBid: 9400, startingPrice: 3000, reservePrice: 3500, minIncrement: 100, bidCount: 12, endsAt: now + 18 * 3600000 + 40 * 60000, status: 'Active', seller: 'Neha Joshi', ownerId: null, location: 'Pune, Maharashtra', image: 'https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?auto=format&fit=crop&w=1200&q=85', description: 'A solid teak table, carefully refurbished and ready for a new home. Small signs of age remain and are shown in the photographs.' },
-  { id: 3, title: 'Engineering mathematics · 3 volumes', category: 'Books', condition: 'Very good', currentBid: 850, startingPrice: 600, reservePrice: 800, minIncrement: 50, bidCount: 9, endsAt: now + 32 * 3600000, status: 'Active', seller: 'Aditi Rao', ownerId: null, location: 'Mumbai, Maharashtra', image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=1200&q=85', description: 'A complete set of three engineering mathematics textbooks. Pages are clean with a few pencil notes in the margins.' },
-  { id: 4, title: 'Automatic dress watch · late 1960s', category: 'Watches', condition: 'Very good', currentBid: 21500, startingPrice: 15000, reservePrice: 18000, minIncrement: 500, bidCount: 27, endsAt: now + 48 * 3600000 + 12 * 60000, status: 'Active', seller: 'Sameer Khan', ownerId: null, location: 'Delhi, NCR', image: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?auto=format&fit=crop&w=1200&q=85', description: 'A vintage automatic watch with a clean silver dial, recently serviced and keeping time. Comes with a brown leather strap.' },
-  { id: 5, title: 'Pair of hand-thrown stoneware vessels', category: 'Collectibles', condition: 'Excellent', currentBid: 1850, startingPrice: 1200, reservePrice: 1500, minIncrement: 100, bidCount: 6, endsAt: now + 60 * 3600000 + 8 * 60000, status: 'Active', seller: 'Priya Nair', ownerId: null, location: 'Jaipur, Rajasthan', image: 'https://images.unsplash.com/photo-1578749556568-bc2c40e68b61?auto=format&fit=crop&w=1200&q=85', description: 'Two hand-thrown stoneware vessels with a soft ash glaze. Signed on the base and carefully packed for delivery.' },
-  { id: 6, title: 'Olympus OM-1 with 50mm lens', category: 'Cameras', condition: 'Good', currentBid: 3100, startingPrice: 1800, reservePrice: 2000, minIncrement: 100, bidCount: 14, endsAt: now + 72 * 3600000 + 19 * 60000, status: 'Active', seller: 'Rohan Mehta', ownerId: null, location: 'Mumbai, Maharashtra', image: 'https://images.unsplash.com/photo-1510127034890-1ee0b8c7a9f9?auto=format&fit=crop&w=1200&q=85', description: 'A compact 35mm SLR with a bright 50mm prime. Light meter and shutter speeds tested; viewfinder is clear.' }
+  { id: 1, title: 'The Genesis Chronograph 1984', category: 'Fine Watches', condition: 'Excellent', currentBid: 72000, startingPrice: 65000, reservePrice: 85000, minIncrement: 1000, bidCount: 18, endsAt: now + 5 * 3600000 + 23 * 60000, status: 'Active', seller: 'Rohan Mehta', ownerId: null, location: 'Mumbai, Maharashtra', image: 'assets/lot_watch.jpg', description: 'Ultra-rare perpetual calendar chronometer in platinum. Features caliber 2892 automatic movement, tritium hands, and sapphire crystal exhibition caseback.' },
+  { id: 2, title: 'Dutch Masters Floral Still Life (c. 1675)', category: 'Rare Collectibles', condition: 'Good', currentBid: 18500, startingPrice: 15000, reservePrice: 20000, minIncrement: 500, bidCount: 12, endsAt: now + 18 * 3600000 + 40 * 60000, status: 'Active', seller: 'Neha Joshi', ownerId: null, location: 'Pune, Maharashtra', image: 'assets/lot_art.jpg', description: 'Oil on canvas by Dutch Golden Age master. Preserved in carved gilded wood frame with historical gallery provenance records.' },
+  { id: 3, title: 'Porsche Panamera Turbo Executive Edition', category: 'Vehicles', condition: 'Very good', currentBid: 168000, startingPrice: 150000, reservePrice: 185000, minIncrement: 2000, bidCount: 9, endsAt: now + 32 * 3600000, status: 'Active', seller: 'Aditi Rao', ownerId: null, location: 'Mumbai, Maharashtra', image: 'assets/lot_car.jpg', description: 'Twin-turbo V8 sports saloon in Agate Grey metallic. Dealer serviced with full inspection log, ceramic brakes, and sport chrono package.' },
+  { id: 4, title: 'Vintage 35mm rangefinder camera', category: 'Cameras', condition: 'Excellent', currentBid: 6200, startingPrice: 4500, reservePrice: 5000, minIncrement: 100, bidCount: 14, endsAt: now + 48 * 3600000 + 12 * 60000, status: 'Active', seller: 'Sameer Khan', ownerId: null, location: 'Delhi, NCR', image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=85', description: 'A well-kept film camera with a bright viewfinder and smooth mechanical action. Includes body cap, strap, and original leather case.' },
+  { id: 5, title: 'Refurbished teak study table', category: 'Furniture', condition: 'Good', currentBid: 9400, startingPrice: 3000, reservePrice: 3500, minIncrement: 100, bidCount: 8, endsAt: now + 60 * 3600000 + 8 * 60000, status: 'Active', seller: 'Priya Nair', ownerId: null, location: 'Jaipur, Rajasthan', image: 'https://images.unsplash.com/photo-1567538096630-e0c55bd6374c?auto=format&fit=crop&w=1200&q=85', description: 'A solid teak table, carefully refurbished and ready for a new home. Small signs of age remain and are shown in the photographs.' },
+  { id: 6, title: 'Engineering mathematics · 3 volumes', category: 'Books', condition: 'Very good', currentBid: 850, startingPrice: 600, reservePrice: 800, minIncrement: 50, bidCount: 6, endsAt: now + 72 * 3600000 + 19 * 60000, status: 'Active', seller: 'Vikram Malhotra', ownerId: null, location: 'Mumbai, Maharashtra', image: 'https://images.unsplash.com/photo-1544947950-fa07a98d237f?auto=format&fit=crop&w=1200&q=85', description: 'A complete set of three engineering mathematics textbooks. Pages are clean with a few pencil notes in the margins.' }
 ];
 const users = [];
 const sessions = new Map();
@@ -390,7 +391,7 @@ async function api(req, res, url) {
     const auction = { id: nextAuctionId++, ...item, bidCount: 0, endsAt: item.endsAt, status: 'Active', ownerId: user.id, seller: user.name, winnerId: null };
     auctions.unshift(auction);
     addAudit(user, 'CREATE_LISTING', 'auction', auction.id);
-    return sendJson(res, 201, auction);
+    return sendJson(res, 201, publicAuction(auction, user));
   }
 
   const listingMatch = route.match(/^\/api\/listings\/(\d+)$/);
@@ -409,7 +410,7 @@ async function api(req, res, url) {
       if (!updated) return;
       Object.assign(item, updated);
       addAudit(user, 'EDIT_LISTING', 'auction', item.id);
-      return sendJson(res, 200, item);
+      return sendJson(res, 200, publicAuction(item, user));
     }
     if (req.method === 'DELETE') {
       if (item.status !== 'Active') return sendJson(res, 409, { error: 'Only active listings can be cancelled.' });
@@ -596,15 +597,34 @@ function serveFile(req, res, url) {
   });
 }
 
-async function bootstrapAdmin() {
-  const email = String(process.env.ADMIN_EMAIL || '').trim().toLowerCase();
-  const password = String(process.env.ADMIN_PASSWORD || '');
-  if (!email && !password) return;
-  if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 12) throw new Error('Set a valid ADMIN_EMAIL and an ADMIN_PASSWORD of at least 12 characters, or leave both unset.');
-  const credentials = await hashPassword(password);
-  const adminUser = { id: nextUserId++, name: process.env.ADMIN_NAME || 'Administrator', email, role: 'Admin', status: 'Active', joinedAt: Date.now(), ...credentials };
-  users.push(adminUser);
-  watchlists.set(adminUser.id, new Set());
+async function bootstrapAccounts() {
+  // 1. Administrator (uses environment variables if provided, otherwise sensible defaults)
+  const adminEmail = String(process.env.ADMIN_EMAIL || 'admin@theauctionsociety.internal').trim().toLowerCase();
+  const adminPassword = String(process.env.ADMIN_PASSWORD || 'super-secret-admin-pass');
+  if (!users.some(u => u.email === adminEmail)) {
+    const adminCreds = await hashPassword(adminPassword);
+    const adminUser = { id: nextUserId++, name: process.env.ADMIN_NAME || 'Administrator', email: adminEmail, role: 'Admin', status: 'Active', joinedAt: Date.now(), ...adminCreds };
+    users.push(adminUser);
+    watchlists.set(adminUser.id, new Set());
+  }
+
+  // 2. Pre-configured Demo Buyer
+  const buyerEmail = 'buyer@theauctionsociety.internal';
+  if (!users.some(u => u.email === buyerEmail)) {
+    const buyerCreds = await hashPassword('buyer12345');
+    const buyerUser = { id: nextUserId++, name: 'Ankit Anand (Buyer)', email: buyerEmail, role: 'Buyer', status: 'Active', joinedAt: Date.now(), ...buyerCreds };
+    users.push(buyerUser);
+    watchlists.set(buyerUser.id, new Set());
+  }
+
+  // 3. Pre-configured Demo Seller
+  const sellerEmail = 'seller@theauctionsociety.internal';
+  if (!users.some(u => u.email === sellerEmail)) {
+    const sellerCreds = await hashPassword('seller12345');
+    const sellerUser = { id: nextUserId++, name: 'Aryaman Annavajhala (Seller)', email: sellerEmail, role: 'Seller', status: 'Active', joinedAt: Date.now(), ...sellerCreds };
+    users.push(sellerUser);
+    watchlists.set(sellerUser.id, new Set());
+  }
 }
 
 const server = http.createServer(async (req, res) => {
@@ -623,9 +643,9 @@ closeExpiredAuctions();
 const auctionClock = setInterval(closeExpiredAuctions, 30_000);
 auctionClock.unref();
 
-bootstrapAdmin().then(() => server.listen(PORT, HOST, () => {
+bootstrapAccounts().then(() => server.listen(PORT, HOST, () => {
   console.log(`Auction house running at http://localhost:${PORT}`);
-  console.log(process.env.ADMIN_EMAIL ? 'Admin account loaded from environment.' : 'Admin setup is available through ADMIN_EMAIL and ADMIN_PASSWORD environment variables.');
+  console.log(`Demo accounts loaded: admin@theauctionsociety.internal, buyer@theauctionsociety.internal, seller@theauctionsociety.internal`);
 })).catch(error => {
   console.error(error.message);
   process.exitCode = 1;

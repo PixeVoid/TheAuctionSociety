@@ -17,7 +17,10 @@
 No third-party packages or heavy installs required. Runs natively on standard **Node.js (v18+)**:
 
 ```bash
-# 1. Start the server (includes default admin credentials)
+# 1. Start the server (demo accounts are bootstrapped automatically):
+npm start
+
+# (Optional: override administrator credentials via environment variables)
 ADMIN_EMAIL="admin@theauctionsociety.internal" ADMIN_PASSWORD="super-secret-admin-pass" npm start
 
 # 2. Open in your browser:
@@ -26,8 +29,8 @@ http://localhost:3000
 
 > **Pre-configured Accounts for Viva Demonstration**:
 > - **Administrator**: `admin@theauctionsociety.internal` / `super-secret-admin-pass`
-> - **Buyer**: `buyer@theauctionsociety.internal` / `buyer123`
-> - **Seller**: `seller@theauctionsociety.internal` / `seller123`
+> - **Buyer**: `buyer@theauctionsociety.internal` / `buyer12345`
+> - **Seller**: `seller@theauctionsociety.internal` / `seller12345`
 
 ---
 
