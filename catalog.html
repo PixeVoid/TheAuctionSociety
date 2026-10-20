@@ -47,7 +47,7 @@
                       <li data-scramble-hover="link" class="twostep-nav__li"><a href="catalog.html" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-span">AUCTIONS</span></a></li>
                       <li data-scramble-hover="link" class="twostep-nav__li"><a href="architecture.html" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-span">DBMS ARCHITECTURE</span></a></li>
                       <li data-scramble-hover="link" class="twostep-nav__li"><a href="system-log.html" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-span">SYSTEM LOG</span></a></li>
-                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="account.html" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-span">ACCOUNT</span></a></li>
+                      <li data-scramble-hover="link" class="twostep-nav__li"><a href="account.html" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-span" id="crt-nav-account-label">ACCOUNT</span></a></li>
                     </ul>
                     <ul class="twostep-nav__ul is--small">
                       <li data-scramble-hover="link" class="twostep-nav__li"><a href="architecture.html#schema" class="twostep-nav__link w-inline-block"><span data-scramble-hover="target" class="twostep-nav__link-eyebrow">Schema</span></a></li>
@@ -146,32 +146,32 @@
         </div>
 
         <form id="lot-bid-form" class="lot-bid-form">
-          <label for="lot-bid-input" class="bid-form-label">
+          <label for="bid-amount-input" class="bid-input-label">
             YOUR BID AMOUNT (INR ₹)
             <span class="bid-min-hint" id="lot-bid-min-hint">Min: ₹0</span>
           </label>
-          <div class="bid-input-group">
-            <span class="currency-prefix">₹</span>
-            <input type="number" id="lot-bid-input" class="bid-input" placeholder="Enter bid..." required min="1" step="1" />
+          <div class="bid-input-wrap">
+            <span class="bid-currency-symbol">₹</span>
+            <input type="number" id="bid-amount-input" class="bid-amount-input" placeholder="Enter bid..." required min="1" step="1" />
           </div>
-          <div class="quick-bid-buttons" id="quick-bid-pills">
-            <!-- Rendered dynamically e.g. +500, +1000, +5000 -->
+          <div class="quick-increment-btns" id="quick-bid-pills">
+            <button type="button" class="quick-bid-btn" data-inc="500">+₹500</button>
+            <button type="button" class="quick-bid-btn" data-inc="1000">+₹1,000</button>
+            <button type="button" class="quick-bid-btn" data-inc="5000">+₹5,000</button>
+            <button type="button" class="quick-bid-btn" data-inc="25000">+₹25,000</button>
           </div>
-          <button type="submit" class="btn-submit-bid" id="btn-submit-bid">Submit Bid (SQL Transaction)</button>
+          <div class="bid-form-feedback" id="bid-form-feedback"></div>
+          <div class="bid-form-actions">
+            <button type="submit" class="btn-bid-submit" id="btn-submit-bid">Place Bid (SQL Transaction)</button>
+            <button type="button" class="btn-watchlist-toggle" id="lot-modal-watchlist-btn">♥ Save</button>
+          </div>
         </form>
 
         <div class="bid-history-wrap">
           <div class="bid-history-title">RECENT TRANSACTION LOG</div>
-          <div class="bid-history-list" id="lot-bid-history-list">
+          <div class="recent-bids-list" id="lot-modal-bids-list">
             <!-- Live bid rows -->
           </div>
-        </div>
-
-        <div class="lot-actions-footer">
-          <button type="button" class="btn-toggle-watchlist" id="btn-modal-watchlist">
-            <span id="modal-watchlist-heart">🤍</span>
-            <span id="modal-watchlist-text">Save to Watchlist</span>
-          </button>
         </div>
       </div>
     </div>
@@ -186,11 +186,11 @@
     <div class="marquee-css-2">
       <div class="marquee-css__list">
         <div class="marquee-css__item-2">
-          <p class="marquee-css__item-p-2">THE AUCTION SOCIETY ✦ REAL-TIME ACID BID TRANSACTIONS ✦ SERIALIZABLE ISOLATION ✦ SPIT MUMBAI ✦ ANKIT ANAND & AYAMAN ANNAVAJHALA ✦</p>
+          <p class="marquee-css__item-p-2">THE AUCTION SOCIETY ✦ REAL-TIME ACID BID TRANSACTIONS ✦ SERIALIZABLE ISOLATION ✦ SPIT MUMBAI ✦ ANKIT ANAND & ARYAMAN ANNAVAJHALA ✦</p>
           <p class="marquee-css__item-p-2 etoile">✦</p>
         </div>
         <div class="marquee-css__item-2">
-          <p class="marquee-css__item-p-2">THE AUCTION SOCIETY ✦ REAL-TIME ACID BID TRANSACTIONS ✦ SERIALIZABLE ISOLATION ✦ SPIT MUMBAI ✦ ANKIT ANAND & AYAMAN ANNAVAJHALA ✦</p>
+          <p class="marquee-css__item-p-2">THE AUCTION SOCIETY ✦ REAL-TIME ACID BID TRANSACTIONS ✦ SERIALIZABLE ISOLATION ✦ SPIT MUMBAI ✦ ANKIT ANAND & ARYAMAN ANNAVAJHALA ✦</p>
           <p class="marquee-css__item-p-2 etoile">✦</p>
         </div>
       </div>

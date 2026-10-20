@@ -52,11 +52,21 @@ let nextAuctionId = Math.max(...auctions.map(item => item.id)) + 1;
 let nextCategoryId = Math.max(...categories.map(item => item.id)) + 1;
 let nextAuditId = 1;
 
+const sampleBidderPool = [
+  'Vikram Malhotra',
+  'Sunita Sharma',
+  'Kabir Verma',
+  'Aarav Patel',
+  'Meera Sen',
+  'Kavita Iyer'
+];
+
 for (const item of auctions) {
+  const bidders = sampleBidderPool.filter(name => name !== item.seller);
   item.sampleBids = [
-    { bidderName: 'Aditi Rao', amount: item.currentBid - item.minIncrement * 2, at: now - 7 * 3600000 },
-    { bidderName: 'Sameer Khan', amount: item.currentBid - item.minIncrement, at: now - 3 * 3600000 },
-    { bidderName: 'Neha Joshi', amount: item.currentBid, at: now - 45 * 60000 }
+    { bidderName: bidders[0], bidder: bidders[0], amount: item.currentBid - item.minIncrement * 2, at: now - 7 * 3600000, time: now - 7 * 3600000 },
+    { bidderName: bidders[1], bidder: bidders[1], amount: item.currentBid - item.minIncrement, at: now - 3 * 3600000, time: now - 3 * 3600000 },
+    { bidderName: bidders[2], bidder: bidders[2], amount: item.currentBid, at: now - 45 * 60000, time: now - 45 * 60000 }
   ];
 }
 
@@ -165,9 +175,34 @@ function closeExpiredAuctions() {
 
 function publicAuction(item, user) {
   const realBids = bids.filter(bid => bid.auctionId === item.id);
-  const recentBids = [...realBids, ...(item.sampleBids || [])].sort((a, b) => b.at - a.at).slice(0, 10).map(bid => ({ amount: bid.amount, bidderName: bid.bidderName, at: bid.at }));
+  const recentBids = [...realBids, ...(item.sampleBids || [])]
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 10)
+    .map(bid => ({
+      amount: bid.amount,
+      bidderName: bid.bidderName || bid.bidder,
+      bidder: bid.bidder || bid.bidderName,
+      at: bid.at || bid.time,
+      time: bid.time || bid.at
+    }));
+
+  const isOwner = Boolean(user && item.ownerId === user.id);
+  const isAdmin = Boolean(user && user.role === 'Admin');
+  const reserveMet = Boolean(item.currentBid >= item.reservePrice);
+
+  // Redact reserve price from non-owners to protect confidentiality
+  const reservePrice = (isOwner || isAdmin) ? item.reservePrice : null;
   const { ownerId, winnerId, sampleBids, ...visible } = item;
-  return { ...visible, watching: Boolean(user && watchlists.get(user.id)?.has(item.id)), recentBids };
+
+  return {
+    ...visible,
+    reservePrice,
+    reserveMet,
+    isOwner,
+    watching: Boolean(user && watchlists.get(user.id)?.has(item.id)),
+    recentBids,
+    paymentStatus: item.payment?.status || null
+  };
 }
 
 function hashPassword(password, salt = crypto.randomBytes(16)) {
@@ -204,7 +239,9 @@ async function api(req, res, url) {
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '');
     const role = String(body.role || 'Buyer');
-    if (name.length < 2 || !/^\S+@\S+\.\S+$/.test(email) || password.length < 8) return sendJson(res, 400, { error: 'Enter your name, a valid email, and a password with at least 8 characters.' });
+    if (name.length < 2 || name.length > 80 || !/^\S+@\S+\.\S+$/.test(email) || email.length > 120 || password.length < 8 || password.length > 128) {
+      return sendJson(res, 400, { error: 'Please enter a valid name (2-80 characters), a valid email address (max 120 characters), and a password of at least 8 characters.' });
+    }
     if (!['Buyer', 'Seller', 'Both'].includes(role)) return sendJson(res, 400, { error: 'Choose Buyer, Seller, or Both.' });
     if (users.some(user => user.email === email)) return sendJson(res, 409, { error: 'An account already exists with that email.' });
     const credentials = await hashPassword(password);
@@ -245,10 +282,23 @@ async function api(req, res, url) {
     const category = url.searchParams.get('category');
     const query = (url.searchParams.get('q') || '').trim().toLowerCase();
     const status = url.searchParams.get('status');
-    const rows = auctions.filter(item => item.status !== 'Cancelled'
+    const sort = url.searchParams.get('sort') || 'ending_soon';
+
+    let rows = auctions.filter(item => item.status !== 'Cancelled'
       && (!category || category === 'All lots' || item.category === category)
       && (!status || item.status === status)
       && (!query || `${item.title} ${item.category} ${item.seller} ${item.description}`.toLowerCase().includes(query)));
+
+    if (sort === 'bid_desc') {
+      rows.sort((a, b) => b.currentBid - a.currentBid);
+    } else if (sort === 'bid_asc') {
+      rows.sort((a, b) => a.currentBid - b.currentBid);
+    } else if (sort === 'newest') {
+      rows.sort((a, b) => b.id - a.id);
+    } else { // default 'ending_soon'
+      rows.sort((a, b) => a.endsAt - b.endsAt);
+    }
+
     return sendJson(res, 200, rows.map(item => publicAuction(item, user)));
   }
 
@@ -266,10 +316,14 @@ async function api(req, res, url) {
       if (!body) return;
       const amount = Number(body.amount);
       if (user.role === 'Admin') return sendJson(res, 403, { error: 'Admin accounts cannot place bids.' });
+      if (user.role === 'Seller') return sendJson(res, 403, { error: 'Seller-only accounts cannot place bids. Use a Buyer or Both account.' });
       if (item.status !== 'Active' || item.endsAt <= Date.now()) return sendJson(res, 409, { error: 'This auction is no longer accepting bids.' });
       if (item.ownerId === user.id) return sendJson(res, 403, { error: 'You cannot bid on your own listing.' });
+      const MAX_BID = 100_000_000;
       const minimumBid = item.bidCount === 0 ? item.startingPrice : item.currentBid + item.minIncrement;
-      if (!Number.isFinite(amount) || amount < minimumBid) return sendJson(res, 400, { error: `Your bid must be at least ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(minimumBid)}.` });
+      if (!Number.isFinite(amount) || amount < minimumBid || amount > MAX_BID) {
+        return sendJson(res, 400, { error: `Your bid must be between ${new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(minimumBid)} and ₹100,000,000.` });
+      }
       item.currentBid = Math.round(amount * 100) / 100;
       item.bidCount++;
       bids.push({ id: bids.length + 1, auctionId: item.id, userId: user.id, bidderName: user.name, amount: item.currentBid, at: Date.now() });
@@ -280,6 +334,7 @@ async function api(req, res, url) {
     if (req.method === 'POST' && action === 'watchlist') {
       const user = authorize(req, res);
       if (!user) return;
+      if (!watchlists.has(user.id)) watchlists.set(user.id, new Set());
       const saved = watchlists.get(user.id);
       if (saved.has(item.id)) saved.delete(item.id); else saved.add(item.id);
       addAudit(user, saved.has(item.id) ? 'SAVE_AUCTION' : 'UNSAVE_AUCTION', 'watchlist', item.id);
@@ -301,13 +356,27 @@ async function api(req, res, url) {
   if (req.method === 'GET' && route === '/api/dashboard') {
     const user = authorize(req, res);
     if (!user) return;
-    const myBids = bids.filter(bid => bid.userId === user.id).map(bid => ({ ...bid, auction: findAuction(bid.auctionId) }));
+    const myBids = bids.filter(bid => bid.userId === user.id).map(bid => {
+      const auction = findAuction(bid.auctionId);
+      const allItemBids = bids.filter(b => b.auctionId === bid.auctionId).sort((a, b) => b.amount - a.amount || a.at - b.at);
+      const isWinning = allItemBids.length > 0 && allItemBids[0].id === bid.id;
+      return {
+        ...bid,
+        bidder: bid.bidderName || user.name,
+        time: bid.at,
+        isWinning: Boolean(isWinning),
+        auction: auction ? publicAuction(auction, user) : null
+      };
+    });
     return sendJson(res, 200, {
       user: safeUser(user),
       myBids,
-      myAuctions: auctions.filter(item => item.ownerId === user.id),
-      saved: auctions.filter(item => watchlists.get(user.id)?.has(item.id)),
-      won: auctions.filter(item => item.winnerId === user.id)
+      myAuctions: auctions.filter(item => item.ownerId === user.id).map(item => publicAuction(item, user)),
+      saved: auctions.filter(item => watchlists.get(user.id)?.has(item.id)).map(item => publicAuction(item, user)),
+      won: auctions.filter(item => item.winnerId === user.id).map(item => ({
+        ...publicAuction(item, user),
+        paymentStatus: item.payment?.status || 'Pending'
+      }))
     });
   }
 
@@ -447,10 +516,29 @@ function validateListing(body, res) {
   if (title.length < 3 || title.length > 100) { sendJson(res, 400, { error: 'Object names must be between 3 and 100 characters.' }); return null; }
   if (!categoryExists(category)) { sendJson(res, 400, { error: 'Choose a category from the available list.' }); return null; }
   if (!['New', 'Excellent', 'Very good', 'Good', 'Fair', 'Used', 'Refurbished'].includes(condition)) { sendJson(res, 400, { error: 'Choose a valid condition.' }); return null; }
-  if (!Number.isFinite(startingPrice) || startingPrice <= 0 || !Number.isFinite(minIncrement) || minIncrement <= 0 || !Number.isFinite(reservePrice) || reservePrice < 0) { sendJson(res, 400, { error: 'Prices must be valid positive amounts; reserve price may be zero.' }); return null; }
-  if (!Number.isFinite(endsAt) || endsAt <= Date.now()) { sendJson(res, 400, { error: 'Choose an end date in the future.' }); return null; }
+  const MAX_PRICE = 100_000_000;
+  if (!Number.isFinite(startingPrice) || startingPrice <= 0 || startingPrice > MAX_PRICE ||
+      !Number.isFinite(minIncrement) || minIncrement <= 0 || minIncrement > MAX_PRICE ||
+      !Number.isFinite(reservePrice) || reservePrice < 0 || reservePrice > MAX_PRICE) {
+    sendJson(res, 400, { error: 'Prices must be valid positive amounts up to ₹100,000,000.' });
+    return null;
+  }
+  if (reservePrice > 0 && reservePrice < startingPrice) {
+    sendJson(res, 400, { error: 'Reserve price cannot be less than the starting price.' });
+    return null;
+  }
+  const now = Date.now();
+  const minDuration = 60 * 60 * 1000; // at least 1 hour
+  const maxDuration = 30 * 24 * 60 * 60 * 1000; // at most 30 days
+  if (!Number.isFinite(endsAt) || endsAt < now + minDuration || endsAt > now + maxDuration) {
+    sendJson(res, 400, { error: 'Auction end time must be between 1 hour and 30 days from now.' });
+    return null;
+  }
   const image = String(body.image || '').trim();
-  if (image && !/^https:\/\//i.test(image)) { sendJson(res, 400, { error: 'Image address must start with https://.' }); return null; }
+  if (image && !/^https:\/\/[^\s"'<>\\]+$/i.test(image)) {
+    sendJson(res, 400, { error: 'Image address must be a valid https:// URL without quotes or whitespace.' });
+    return null;
+  }
   return {
     title, category, condition,
     currentBid: startingPrice,
@@ -464,19 +552,46 @@ function validateListing(body, res) {
   };
 }
 
+const ALLOWED_STATIC_EXTS = new Set([
+  '.html', '.css', '.js', '.png', '.jpg', '.jpeg', '.svg', '.webp', '.gif', '.ico', '.woff', '.woff2', '.ttf', '.otf'
+]);
+const BLOCKED_NAMES = new Set([
+  'server.js', 'package.json', 'package-lock.json', 'readme.md', 'project_checklist.md'
+]);
+
 function serveFile(req, res, url) {
-  const requested = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
+  let requested = '';
+  try {
+    requested = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
+  } catch {
+    return sendJson(res, 400, { error: 'Invalid URL encoding.' });
+  }
+
   let filePath = path.resolve(ROOT, `.${requested}`);
-  if (!filePath.startsWith(`${ROOT}${path.sep}`)) return sendJson(res, 403, { error: 'Forbidden.' });
+  if (!filePath.startsWith(`${ROOT}${path.sep}`) && filePath !== ROOT) {
+    return sendJson(res, 403, { error: 'Forbidden.' });
+  }
 
   // Support clean extensionless HTML routing
   if (!path.extname(filePath) && !fs.existsSync(filePath) && fs.existsSync(`${filePath}.html`)) {
     filePath = `${filePath}.html`;
   }
 
+  const basename = path.basename(filePath).toLowerCase();
+  const ext = path.extname(filePath).toLowerCase();
+
+  // Protect sensitive files, hidden directories, node scripts, metadata
+  if (basename.startsWith('.') || BLOCKED_NAMES.has(basename) || ext === '.json' || ext === '.md' || ext === '.sql' || !ALLOWED_STATIC_EXTS.has(ext)) {
+    return sendJson(res, 404, { error: 'Page not found.' });
+  }
+
   fs.readFile(filePath, (error, content) => {
     if (error) return sendJson(res, 404, { error: 'Page not found.' });
-    res.writeHead(200, { 'Content-Type': MIME[path.extname(filePath)] || 'application/octet-stream', 'X-Content-Type-Options': 'nosniff' });
+    res.writeHead(200, {
+      'Content-Type': MIME[ext] || 'application/octet-stream',
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'SAMEORIGIN'
+    });
     res.end(content);
   });
 }
@@ -487,7 +602,9 @@ async function bootstrapAdmin() {
   if (!email && !password) return;
   if (!/^\S+@\S+\.\S+$/.test(email) || password.length < 12) throw new Error('Set a valid ADMIN_EMAIL and an ADMIN_PASSWORD of at least 12 characters, or leave both unset.');
   const credentials = await hashPassword(password);
-  users.push({ id: nextUserId++, name: process.env.ADMIN_NAME || 'Administrator', email, role: 'Admin', status: 'Active', joinedAt: Date.now(), ...credentials });
+  const adminUser = { id: nextUserId++, name: process.env.ADMIN_NAME || 'Administrator', email, role: 'Admin', status: 'Active', joinedAt: Date.now(), ...credentials };
+  users.push(adminUser);
+  watchlists.set(adminUser.id, new Set());
 }
 
 const server = http.createServer(async (req, res) => {
