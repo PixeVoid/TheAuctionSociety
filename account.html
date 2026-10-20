@@ -112,6 +112,22 @@
           </div>
           <div id="login-feedback" class="auth-feedback" style="min-height:18px; margin-bottom:12px; font-size:13px; font-weight:600;"></div>
           <button type="submit" class="btn-auth-submit" id="btn-login-submit">Sign In to Account</button>
+
+          <div style="margin-top: 20px; padding: 14px 16px; background: rgba(212, 175, 55, 0.05); border: 1px solid rgba(212, 175, 55, 0.25); border-radius: 6px; font-size: 12px;">
+            <div style="font-weight: 700; color: #d4af37; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 8px;">Demo Evaluation Accounts</div>
+            <div style="display: flex; flex-direction: column; gap: 5px; color: #aaa; margin-bottom: 12px; font-family: monospace;">
+              <div><span style="color:#fff; font-weight:600;">Admin:</span> admin@theauctionsociety.com · admin12345</div>
+              <div><span style="color:#fff; font-weight:600;">Buyer:</span> buyer@theauctionsociety.com · buyer12345</div>
+              <div><span style="color:#fff; font-weight:600;">Seller:</span> seller@theauctionsociety.com · seller12345</div>
+              <div><span style="color:#fff; font-weight:600;">Both (Buyer+Seller):</span> member@theauctionsociety.com · both12345</div>
+            </div>
+            <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+              <button type="button" class="btn-auth-submit" style="flex:1; min-width:85px; padding: 6px 8px; font-size: 11px; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.15);" onclick="document.getElementById('login-email').value='admin@theauctionsociety.com';document.getElementById('login-password').value='admin12345';">Admin</button>
+              <button type="button" class="btn-auth-submit" style="flex:1; min-width:85px; padding: 6px 8px; font-size: 11px; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.15);" onclick="document.getElementById('login-email').value='buyer@theauctionsociety.com';document.getElementById('login-password').value='buyer12345';">Buyer</button>
+              <button type="button" class="btn-auth-submit" style="flex:1; min-width:85px; padding: 6px 8px; font-size: 11px; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.15);" onclick="document.getElementById('login-email').value='seller@theauctionsociety.com';document.getElementById('login-password').value='seller12345';">Seller</button>
+              <button type="button" class="btn-auth-submit" style="flex:1; min-width:85px; padding: 6px 8px; font-size: 11px; background: #1a1a1a; border: 1px solid rgba(255,255,255,0.15);" onclick="document.getElementById('login-email').value='member@theauctionsociety.com';document.getElementById('login-password').value='both12345';">Both</button>
+            </div>
+          </div>
         </form>
 
         <!-- Register Form -->

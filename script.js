@@ -22,7 +22,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
     activeLot: null,
     activeCategory: '',
     searchQuery: '',
-    sortBy: 'ending_soon',
+    sortBy: 'newest',
     dashboardData: null
   };
 
@@ -231,7 +231,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
       return `
         <article class="lot-card" data-lot-id="${lot.id}">
           <div class="lot-card-thumb-wrap">
-            <img src="${escapeHtml(lot.image)}" alt="${escapeHtml(lot.title)}" class="lot-card-thumb" loading="lazy" />
+            <img src="${escapeHtml(lot.image || 'assets/placeholder.svg')}" alt="${escapeHtml(lot.title)}" class="lot-card-thumb" loading="lazy" onerror="this.onerror=null;this.src='assets/placeholder.svg';" />
             <div class="lot-card-badges-overlay">
               <div class="lot-card-badges-left">
                 <span class="badge-square green">LOT #${lot.id.toString().padStart(3, '0')}</span>
@@ -288,7 +288,12 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
       state.activeLot = lot;
 
       document.getElementById('lot-modal-header-title').textContent = `${lot.title} (LOT #${lot.id})`;
-      document.getElementById('lot-modal-img').src = lot.image;
+      const modalImg = document.getElementById('lot-modal-img');
+      if (modalImg) {
+        modalImg.onerror = () => { modalImg.src = 'assets/placeholder.svg'; };
+        modalImg.src = lot.image || 'assets/placeholder.svg';
+        modalImg.alt = lot.title || 'Auction lot';
+      }
       document.getElementById('lot-modal-badge-lot').textContent = `LOT #${lot.id.toString().padStart(3, '0')}`;
       document.getElementById('lot-modal-badge-cat').textContent = lot.category;
       document.getElementById('lot-modal-badge-cond').textContent = lot.condition;

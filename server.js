@@ -225,7 +225,16 @@ function categoryExists(name) { return categories.some(category => category.name
 
 async function api(req, res, url) {
   closeExpiredAuctions();
-  const route = url.pathname;
+  let route = url.pathname;
+  if (route.startsWith('/api/[...') || route.startsWith('/api/index') || !route.startsWith('/api/')) {
+    const candidate = req.headers['x-matched-path'] || req.headers['x-forwarded-url'] || req.url;
+    try {
+      const parsed = new URL(candidate, 'http://localhost').pathname;
+      if (parsed.startsWith('/api/')) route = parsed;
+    } catch {
+      // Keep default
+    }
+  }
 
   if (req.method === 'GET' && route === '/api/me') {
     const user = getUser(req);
@@ -283,7 +292,7 @@ async function api(req, res, url) {
     const category = url.searchParams.get('category');
     const query = (url.searchParams.get('q') || '').trim().toLowerCase();
     const status = url.searchParams.get('status');
-    const sort = url.searchParams.get('sort') || 'ending_soon';
+    const sort = url.searchParams.get('sort') || 'newest';
 
     let rows = auctions.filter(item => item.status !== 'Cancelled'
       && (!category || category === 'All lots' || item.category === category)
@@ -294,10 +303,10 @@ async function api(req, res, url) {
       rows.sort((a, b) => b.currentBid - a.currentBid);
     } else if (sort === 'bid_asc') {
       rows.sort((a, b) => a.currentBid - b.currentBid);
-    } else if (sort === 'newest') {
-      rows.sort((a, b) => b.id - a.id);
-    } else { // default 'ending_soon'
+    } else if (sort === 'ending_soon') {
       rows.sort((a, b) => a.endsAt - b.endsAt);
+    } else { // default 'newest' / 'latest'
+      rows.sort((a, b) => b.id - a.id);
     }
 
     return sendJson(res, 200, rows.map(item => publicAuction(item, user)));
@@ -513,7 +522,7 @@ function validateListing(body, res) {
   const startingPrice = Number(body.startingPrice);
   const minIncrement = Number(body.minIncrement || 100);
   const reservePrice = Number(body.reservePrice || 0);
-  const endsAt = new Date(body.endDate).getTime();
+  const endsAt = body.endDate ? new Date(body.endDate).getTime() : (body.durationDays ? Date.now() + Number(body.durationDays) * 86400000 : NaN);
   if (title.length < 3 || title.length > 100) { sendJson(res, 400, { error: 'Object names must be between 3 and 100 characters.' }); return null; }
   if (!categoryExists(category)) { sendJson(res, 400, { error: 'Choose a category from the available list.' }); return null; }
   if (!['New', 'Excellent', 'Very good', 'Good', 'Fair', 'Used', 'Refurbished'].includes(condition)) { sendJson(res, 400, { error: 'Choose a valid condition.' }); return null; }
@@ -548,7 +557,7 @@ function validateListing(body, res) {
     minIncrement,
     endsAt,
     location: String(body.location || 'Mumbai, Maharashtra').trim().slice(0, 100),
-    image: image || 'https://images.unsplash.com/photo-1490312278390-ab64016e0aa9?auto=format&fit=crop&w=1200&q=85',
+    image: image || 'assets/placeholder.svg',
     description: String(body.description || '').trim().slice(0, 3000)
   };
 }
@@ -560,22 +569,108 @@ const BLOCKED_NAMES = new Set([
   'server.js', 'package.json', 'package-lock.json', 'readme.md', 'project_checklist.md'
 ]);
 
+// Pre-load core assets so Vercel NFT bundles them and requests are served with zero filesystem latency
+const STATIC_CACHE = new Map();
+function cacheLiteral(rel, mime, fullPath) {
+  try {
+    if (fs.existsSync(fullPath)) {
+      STATIC_CACHE.set(rel, { content: fs.readFileSync(fullPath), mime });
+    }
+  } catch {
+    // Ignore if missing
+  }
+}
+
+cacheLiteral('index.html', 'text/html; charset=utf-8', path.join(__dirname, 'index.html'));
+cacheLiteral('catalog.html', 'text/html; charset=utf-8', path.join(__dirname, 'catalog.html'));
+cacheLiteral('account.html', 'text/html; charset=utf-8', path.join(__dirname, 'account.html'));
+cacheLiteral('architecture.html', 'text/html; charset=utf-8', path.join(__dirname, 'architecture.html'));
+cacheLiteral('system-log.html', 'text/html; charset=utf-8', path.join(__dirname, 'system-log.html'));
+cacheLiteral('style.css', 'text/css; charset=utf-8', path.join(__dirname, 'style.css'));
+cacheLiteral('script.js', 'text/javascript; charset=utf-8', path.join(__dirname, 'script.js'));
+cacheLiteral('assets/placeholder.svg', 'image/svg+xml', path.join(__dirname, 'assets/placeholder.svg'));
+cacheLiteral('assets/lot_watch.jpg', 'image/jpeg', path.join(__dirname, 'assets/lot_watch.jpg'));
+cacheLiteral('assets/lot_art.jpg', 'image/jpeg', path.join(__dirname, 'assets/lot_art.jpg'));
+cacheLiteral('assets/lot_car.jpg', 'image/jpeg', path.join(__dirname, 'assets/lot_car.jpg'));
+cacheLiteral('assets/05.png', 'image/png', path.join(__dirname, 'assets/05.png'));
+cacheLiteral('assets/06.png', 'image/png', path.join(__dirname, 'assets/06.png'));
+cacheLiteral('assets/09.png', 'image/png', path.join(__dirname, 'assets/09.png'));
+cacheLiteral('assets/dot.svg', 'image/svg+xml', path.join(__dirname, 'assets/dot.svg'));
+cacheLiteral('assets/favicon-bleu.png', 'image/png', path.join(__dirname, 'assets/favicon-bleu.png'));
+cacheLiteral('assets/sticker-fire-blue.png', 'image/png', path.join(__dirname, 'assets/sticker-fire-blue.png'));
+cacheLiteral('assets/sticker-taco-green.png', 'image/png', path.join(__dirname, 'assets/sticker-taco-green.png'));
+cacheLiteral('assets/sticker-trail-beer.png', 'image/png', path.join(__dirname, 'assets/sticker-trail-beer.png'));
+cacheLiteral('assets/sticker-trail-eye-illu.png', 'image/png', path.join(__dirname, 'assets/sticker-trail-eye-illu.png'));
+cacheLiteral('assets/sticker-trail-taco.png', 'image/png', path.join(__dirname, 'assets/sticker-trail-taco.png'));
+cacheLiteral('assets/team/SAM.png', 'image/png', path.join(__dirname, 'assets/team/SAM.png'));
+cacheLiteral('fonts/SpaceGrotesk-Regular.otf', 'font/otf', path.join(__dirname, 'fonts/SpaceGrotesk-Regular.otf'));
+cacheLiteral('fonts/SpaceGrotesk-Medium.otf', 'font/otf', path.join(__dirname, 'fonts/SpaceGrotesk-Medium.otf'));
+cacheLiteral('fonts/FKRasterRomanCompact-Smooth.ttf', 'font/ttf', path.join(__dirname, 'fonts/FKRasterRomanCompact-Smooth.ttf'));
+cacheLiteral('fonts/KHTekaTRIAL-Regular.otf', 'font/otf', path.join(__dirname, 'fonts/KHTekaTRIAL-Regular.otf'));
+cacheLiteral('fonts/KHInterferenceTRIAL-Regular.otf', 'font/otf', path.join(__dirname, 'fonts/KHInterferenceTRIAL-Regular.otf'));
+
+function findFilePath(requested) {
+  const candidateRoots = [
+    ROOT,
+    process.cwd(),
+    __dirname,
+    path.resolve(__dirname, '..'),
+    path.resolve(process.cwd(), 'public')
+  ];
+
+  for (const rootDir of candidateRoots) {
+    if (!rootDir) continue;
+    try {
+      let target = path.resolve(rootDir, `.${requested}`);
+      if (target.startsWith(`${rootDir}${path.sep}`) || target === rootDir) {
+        if (fs.existsSync(target) && fs.statSync(target).isFile()) {
+          return target;
+        }
+        const htmlTarget = `${target}.html`;
+        if (!path.extname(target) && fs.existsSync(htmlTarget) && fs.statSync(htmlTarget).isFile()) {
+          return htmlTarget;
+        }
+      }
+    } catch {
+      // Continue searching
+    }
+  }
+  return null;
+}
+
 function serveFile(req, res, url) {
   let requested = '';
   try {
-    requested = url.pathname === '/' ? '/index.html' : decodeURIComponent(url.pathname);
+    requested = url.pathname === '/' ? 'index.html' : decodeURIComponent(url.pathname).replace(/^\/+/, '');
   } catch {
     return sendJson(res, 400, { error: 'Invalid URL encoding.' });
   }
 
-  let filePath = path.resolve(ROOT, `.${requested}`);
-  if (!filePath.startsWith(`${ROOT}${path.sep}`) && filePath !== ROOT) {
+  // Normalize and security check
+  const normalized = path.normalize(requested);
+  if (normalized.includes('..') || normalized.startsWith('.')) {
     return sendJson(res, 403, { error: 'Forbidden.' });
   }
 
-  // Support clean extensionless HTML routing
-  if (!path.extname(filePath) && !fs.existsSync(filePath) && fs.existsSync(`${filePath}.html`)) {
-    filePath = `${filePath}.html`;
+  // 1. Check in-memory static cache (handles exact files & clean URLs)
+  let cached = STATIC_CACHE.get(normalized);
+  if (!cached && !path.extname(normalized)) {
+    cached = STATIC_CACHE.get(`${normalized}.html`);
+  }
+
+  if (cached) {
+    res.writeHead(200, {
+      'Content-Type': cached.mime,
+      'X-Content-Type-Options': 'nosniff',
+      'X-Frame-Options': 'SAMEORIGIN'
+    });
+    return res.end(cached.content);
+  }
+
+  // 2. Fallback to filesystem lookup
+  const filePath = findFilePath('/' + normalized);
+  if (!filePath) {
+    return sendJson(res, 404, { error: 'Page not found.' });
   }
 
   const basename = path.basename(filePath).toLowerCase();
@@ -598,37 +693,110 @@ function serveFile(req, res, url) {
 }
 
 async function bootstrapAccounts() {
-  // 1. Administrator (uses environment variables if provided, otherwise sensible defaults)
-  const adminEmail = String(process.env.ADMIN_EMAIL || 'admin@theauctionsociety.internal').trim().toLowerCase();
-  const adminPassword = String(process.env.ADMIN_PASSWORD || 'super-secret-admin-pass');
-  if (!users.some(u => u.email === adminEmail)) {
-    const adminCreds = await hashPassword(adminPassword);
-    const adminUser = { id: nextUserId++, name: process.env.ADMIN_NAME || 'Administrator', email: adminEmail, role: 'Admin', status: 'Active', joinedAt: Date.now(), ...adminCreds };
-    users.push(adminUser);
-    watchlists.set(adminUser.id, new Set());
-  }
+  const accounts = [
+    // 1. Administrator (both .com and .internal)
+    {
+      name: process.env.ADMIN_NAME || 'Administrator',
+      email: String(process.env.ADMIN_EMAIL || 'admin@theauctionsociety.com').trim().toLowerCase(),
+      pass: String(process.env.ADMIN_PASSWORD || 'admin12345'),
+      role: 'Admin'
+    },
+    {
+      name: 'Administrator (Internal)',
+      email: 'admin@theauctionsociety.internal',
+      pass: String(process.env.ADMIN_PASSWORD || 'admin12345'),
+      role: 'Admin'
+    },
+    // 2. Pre-configured Demo Buyer (both .com and .internal)
+    {
+      name: 'Ankit Anand (Buyer)',
+      email: 'buyer@theauctionsociety.com',
+      pass: 'buyer12345',
+      role: 'Buyer'
+    },
+    {
+      name: 'Ankit Anand (Internal)',
+      email: 'buyer@theauctionsociety.internal',
+      pass: 'buyer12345',
+      role: 'Buyer'
+    },
+    // 3. Pre-configured Demo Seller (both .com and .internal)
+    {
+      name: 'Aryaman Annavajhala (Seller)',
+      email: 'seller@theauctionsociety.com',
+      pass: 'seller12345',
+      role: 'Seller'
+    },
+    {
+      name: 'Aryaman Annavajhala (Internal)',
+      email: 'seller@theauctionsociety.internal',
+      pass: 'seller12345',
+      role: 'Seller'
+    },
+    // 4. Pre-configured Demo Member (Both Buyer & Seller privileges)
+    {
+      name: 'Ankit Anand (Member - Both)',
+      email: 'member@theauctionsociety.com',
+      pass: 'both12345',
+      role: 'Both'
+    },
+    {
+      name: 'Member (Internal)',
+      email: 'member@theauctionsociety.internal',
+      pass: 'both12345',
+      role: 'Both'
+    },
+    {
+      name: 'Demo Both Account',
+      email: 'both@theauctionsociety.com',
+      pass: 'both12345',
+      role: 'Both'
+    },
+    {
+      name: 'Demo Both (Internal)',
+      email: 'both@theauctionsociety.internal',
+      pass: 'both12345',
+      role: 'Both'
+    }
+  ];
 
-  // 2. Pre-configured Demo Buyer
-  const buyerEmail = 'buyer@theauctionsociety.internal';
-  if (!users.some(u => u.email === buyerEmail)) {
-    const buyerCreds = await hashPassword('buyer12345');
-    const buyerUser = { id: nextUserId++, name: 'Ankit Anand (Buyer)', email: buyerEmail, role: 'Buyer', status: 'Active', joinedAt: Date.now(), ...buyerCreds };
-    users.push(buyerUser);
-    watchlists.set(buyerUser.id, new Set());
-  }
-
-  // 3. Pre-configured Demo Seller
-  const sellerEmail = 'seller@theauctionsociety.internal';
-  if (!users.some(u => u.email === sellerEmail)) {
-    const sellerCreds = await hashPassword('seller12345');
-    const sellerUser = { id: nextUserId++, name: 'Aryaman Annavajhala (Seller)', email: sellerEmail, role: 'Seller', status: 'Active', joinedAt: Date.now(), ...sellerCreds };
-    users.push(sellerUser);
-    watchlists.set(sellerUser.id, new Set());
+  for (const acc of accounts) {
+    if (!users.some(u => u.email === acc.email)) {
+      const creds = await hashPassword(acc.pass);
+      const user = {
+        id: nextUserId++,
+        name: acc.name,
+        email: acc.email,
+        role: acc.role,
+        status: 'Active',
+        joinedAt: Date.now(),
+        ...creds
+      };
+      users.push(user);
+      watchlists.set(user.id, new Set());
+    }
   }
 }
 
-const server = http.createServer(async (req, res) => {
+let bootstrapped = false;
+let bootstrapPromise = null;
+
+async function ensureBootstrapped() {
+  if (bootstrapped) return;
+  if (!bootstrapPromise) {
+    bootstrapPromise = bootstrapAccounts().then(() => {
+      bootstrapped = true;
+    }).catch(err => {
+      bootstrapPromise = null;
+      throw err;
+    });
+  }
+  return bootstrapPromise;
+}
+
+async function requestListener(req, res) {
   try {
+    await ensureBootstrapped();
     const url = new URL(req.url, `http://${req.headers.host || 'localhost'}`);
     if (url.pathname.startsWith('/api/')) return await api(req, res, url);
     return serveFile(req, res, url);
@@ -637,16 +805,31 @@ const server = http.createServer(async (req, res) => {
     if (!res.headersSent) sendJson(res, 500, { error: 'The server could not complete that request.' });
     else res.end();
   }
-});
+}
+
+const server = http.createServer(requestListener);
 
 closeExpiredAuctions();
 const auctionClock = setInterval(closeExpiredAuctions, 30_000);
 auctionClock.unref();
 
-bootstrapAccounts().then(() => server.listen(PORT, HOST, () => {
-  console.log(`Auction house running at http://localhost:${PORT}`);
-  console.log(`Demo accounts loaded: admin@theauctionsociety.internal, buyer@theauctionsociety.internal, seller@theauctionsociety.internal`);
-})).catch(error => {
-  console.error(error.message);
-  process.exitCode = 1;
-});
+if (require.main === module) {
+  ensureBootstrapped().then(() => {
+    server.listen(PORT, HOST, () => {
+      console.log(`Auction house running at http://localhost:${PORT}`);
+      console.log(`Demo accounts loaded:`);
+      console.log(` - Admin:  admin@theauctionsociety.com  (pass: admin12345)`);
+      console.log(` - Buyer:  buyer@theauctionsociety.com  (pass: buyer12345)`);
+      console.log(` - Seller: seller@theauctionsociety.com (pass: seller12345)`);
+      console.log(` - Member: member@theauctionsociety.com (pass: both12345 - Both Buyer & Seller)`);
+    });
+  }).catch(error => {
+    console.error('Failed to start server:', error.message);
+    process.exitCode = 1;
+  });
+} else {
+  ensureBootstrapped().catch(console.error);
+}
+
+module.exports = server;
+module.exports.default = requestListener;

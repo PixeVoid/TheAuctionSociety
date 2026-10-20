@@ -21,16 +21,22 @@ No third-party packages or heavy installs required. Runs natively on standard **
 npm start
 
 # (Optional: override administrator credentials via environment variables)
-ADMIN_EMAIL="admin@theauctionsociety.internal" ADMIN_PASSWORD="super-secret-admin-pass" npm start
+ADMIN_EMAIL="admin@theauctionsociety.com" ADMIN_PASSWORD="admin12345" npm start
 
 # 2. Open in your browser:
 http://localhost:3000
 ```
 
 > **Pre-configured Accounts for Viva Demonstration**:
-> - **Administrator**: `admin@theauctionsociety.internal` / `super-secret-admin-pass`
-> - **Buyer**: `buyer@theauctionsociety.internal` / `buyer12345`
-> - **Seller**: `seller@theauctionsociety.internal` / `seller12345`
+> - **Administrator**: `admin@theauctionsociety.com` (or `admin@theauctionsociety.internal`) / `admin12345`
+> - **Buyer**: `buyer@theauctionsociety.com` (or `buyer@theauctionsociety.internal`) / `buyer12345`
+> - **Seller**: `seller@theauctionsociety.com` (or `seller@theauctionsociety.internal`) / `seller12345`
+> - **Both (Buyer & Seller)**: `member@theauctionsociety.com` (or `both@theauctionsociety.com`) / `both12345`
+
+### 🌐 Live Production Deployment
+* **Vercel Live URL**: [https://the-auction-society.vercel.app](https://the-auction-society.vercel.app)
+* **GitHub Repository**: [https://github.com/PixeVoid/TheAuctionSociety.git](https://github.com/PixeVoid/TheAuctionSociety.git)
+* **Serverless Architecture**: Configured via `vercel.json` with edge static asset caching (`handle: "filesystem"`) and automated Node.js serverless routing for `/api/*` endpoints.
 
 ---
 

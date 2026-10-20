@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 600" width="800" height="600">
+  <rect width="100%" height="100%" fill="#121216"/>
+  <defs>
+    <pattern id="scanlines" width="100" height="4" patternUnits="userSpaceOnUse">
+      <line x1="0" y1="0" x2="100" y2="0" stroke="rgba(0,0,0,0.4)" stroke-width="2"/>
+    </pattern>
+    <radialGradient id="vignette" cx="50%" cy="50%" r="60%">
+      <stop offset="0%" stop-color="#1c1c24" stop-opacity="1"/>
+      <stop offset="100%" stop-color="#0a0a0d" stop-opacity="1"/>
+    </radialGradient>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#vignette)"/>
+  <rect width="100%" height="100%" fill="url(#scanlines)" opacity="0.6"/>
+  <!-- Corner accents -->
+  <path d="M 60 100 L 60 60 L 100 60" stroke="#d4af37" stroke-width="2" fill="none" opacity="0.7"/>
+  <path d="M 740 100 L 740 60 L 700 60" stroke="#d4af37" stroke-width="2" fill="none" opacity="0.7"/>
+  <path d="M 60 500 L 60 540 L 100 540" stroke="#d4af37" stroke-width="2" fill="none" opacity="0.7"/>
+  <path d="M 740 500 L 740 540 L 700 540" stroke="#d4af37" stroke-width="2" fill="none" opacity="0.7"/>
+  <!-- Inner dashed border -->
+  <rect x="70" y="70" width="660" height="460" fill="none" stroke="rgba(255,255,255,0.08)" stroke-width="1" stroke-dasharray="6 6"/>
+  <!-- Image frame icon -->
+  <g transform="translate(400, 250)" text-anchor="middle">
+    <rect x="-50" y="-38" width="100" height="76" rx="6" fill="none" stroke="#777788" stroke-width="2.5"/>
+    <circle cx="-18" cy="-12" r="8" fill="#777788"/>
+    <path d="M -40 22 L -12 -8 L 10 14 L 26 4 L 40 22" stroke="#777788" stroke-width="2.5" fill="none" stroke-linejoin="round"/>
+    <line x1="-38" y1="36" x2="38" y2="-36" stroke="#d4af37" stroke-width="3" stroke-linecap="round"/>
+  </g>
+  <!-- Text label -->
+  <text x="400" y="360" font-family="'Space Grotesk', -apple-system, sans-serif" font-size="18" font-weight="700" letter-spacing="0.25em" fill="#e8e8e8" text-anchor="middle">IMAGE NOT PRESENT</text>
+  <text x="400" y="392" font-family="'Space Grotesk', -apple-system, sans-serif" font-size="12" letter-spacing="0.12em" fill="#888899" text-anchor="middle">NO PHOTOGRAPH PROVIDED BY CONSIGNOR</text>
+</svg>
