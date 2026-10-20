@@ -825,7 +825,724 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
     }
   }
 
-  // 6. DBMS Architecture & Schema Tab Content
+  // 6. DBMS Architecture & Schema Tab Content with Full Interactive Inspection
+  const ARCH_DATA = {
+    entities: {
+      users: {
+        title: 'TABLE 1: USERS (Account & Identity Ledger)',
+        badge: '3NF Verified',
+        summary: 'Central identity, authentication, and role-based access control (RBAC) ledger. Stores cryptographically salted scrypt hashes and account states.',
+        proof: 'Satisfies 1NF (all column values are atomic; no multivalued attributes), 2NF (table has a single-attribute primary key user_id, eliminating partial dependencies), and 3NF (all non-key attributes depend solely and directly on user_id with zero transitive dependencies).',
+        columns: [
+          { name: 'user_id', type: 'INT', constraints: 'PK, AUTO_INCREMENT', desc: 'Surrogate primary key identifying the member or administrator.' },
+          { name: 'name', type: 'VARCHAR(100)', constraints: 'NOT NULL', desc: 'Full name or pseudonym of the account holder.' },
+          { name: 'email', type: 'VARCHAR(255)', constraints: 'UNIQUE, NOT NULL', desc: 'RFC 5322 compliant unique login address and notice target.' },
+          { name: 'password_hash', type: 'CHAR(128)', constraints: 'NOT NULL', desc: '64-byte scrypt cryptographic hash encoded in hex.' },
+          { name: 'password_salt', type: 'CHAR(32)', constraints: 'NOT NULL', desc: '16-byte cryptographically secure random salt vector.' },
+          { name: 'role', type: "ENUM('Buyer','Seller','Both','Admin')", constraints: "NOT NULL, DEFAULT 'Buyer'", desc: 'RBAC authorization level and privilege boundary.' },
+          { name: 'status', type: "ENUM('Active','Blocked')", constraints: "NOT NULL, DEFAULT 'Active'", desc: 'Account security state (Blocked prevents authentication and bidding).' },
+          { name: 'created_at', type: 'TIMESTAMP', constraints: 'DEFAULT CURRENT_TIMESTAMP', desc: 'UTC account creation timestamp.' }
+        ],
+        ddl: `CREATE TABLE users (
+    user_id INT AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    email VARCHAR(255) NOT NULL,
+    password_hash CHAR(128) NOT NULL,
+    password_salt CHAR(32) NOT NULL,
+    role ENUM('Buyer', 'Seller', 'Both', 'Admin') NOT NULL DEFAULT 'Buyer',
+    status ENUM('Active', 'Blocked') NOT NULL DEFAULT 'Active',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_users PRIMARY KEY (user_id),
+    CONSTRAINT uq_users_email UNIQUE (email),
+    INDEX idx_users_role (role),
+    INDEX idx_users_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        relations: [
+          '1 : N with ITEM — One seller consigns multiple catalog items (ITEM.seller_id → USERS.user_id).',
+          '1 : N with BID — One buyer places multiple atomic bids (BID.bidder_id → USERS.user_id).',
+          '1 : N with PAYMENT — Winning buyers remit payment obligations (PAYMENT.payer_id → USERS.user_id).',
+          'M : N with AUCTION — Resolved via WATCHLIST(user_id, auction_id) junction table.'
+        ],
+        sample: {
+          headers: ['user_id', 'name', 'email', 'role', 'status', 'created_at'],
+          rows: [
+            ['1', 'Administrator', 'admin@theauctionsociety.com', 'Admin', 'Active', '2026-10-20 05:30:00'],
+            ['2', 'Ankit Anand (Buyer)', 'buyer@theauctionsociety.com', 'Buyer', 'Active', '2026-10-20 05:30:00'],
+            ['3', 'Aryaman Annavajhala (Seller)', 'seller@theauctionsociety.com', 'Seller', 'Active', '2026-10-20 05:30:00'],
+            ['7', 'Ankit Anand (Member - Both)', 'member@theauctionsociety.com', 'Both', 'Active', '2026-10-20 05:30:00']
+          ]
+        }
+      },
+      category: {
+        title: 'TABLE 2: CATEGORY (Editorial Curation Taxonomy)',
+        badge: '3NF Verified',
+        summary: 'Curatorial department classification. Organizes consigned luxury lots into structured horology, fine art, automotive, and antique categories.',
+        proof: 'Satisfies 1NF (atomic values), 2NF (primary key is single column category_id), and 3NF (every descriptive attribute depends solely on category_id; slug is uniquely generated from name).',
+        columns: [
+          { name: 'category_id', type: 'INT', constraints: 'PK, AUTO_INCREMENT', desc: 'Surrogate primary key for the department category.' },
+          { name: 'name', type: 'VARCHAR(100)', constraints: 'UNIQUE, NOT NULL', desc: 'Display name of the category (e.g. Fine Watches, Rare Collectibles).' },
+          { name: 'slug', type: 'VARCHAR(100)', constraints: 'UNIQUE, NOT NULL', desc: 'URL-safe slug representation for navigational routing.' },
+          { name: 'description', type: 'TEXT', constraints: 'NULL', desc: 'Curatorial scope description of lots belonging to this category.' }
+        ],
+        ddl: `CREATE TABLE category (
+    category_id INT AUTO_INCREMENT,
+    name VARCHAR(100) NOT NULL,
+    slug VARCHAR(100) NOT NULL,
+    description TEXT,
+    CONSTRAINT pk_category PRIMARY KEY (category_id),
+    CONSTRAINT uq_category_name UNIQUE (name),
+    CONSTRAINT uq_category_slug UNIQUE (slug)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        relations: [
+          '1 : N with ITEM — One category contains multiple catalog lots (ITEM.category_id → CATEGORY.category_id).'
+        ],
+        sample: {
+          headers: ['category_id', 'name', 'slug', 'description'],
+          rows: [
+            ['1', 'Fine Watches', 'fine-watches', 'Horological masterworks and vintage chronometers'],
+            ['2', 'Rare Collectibles', 'rare-collectibles', 'Fine art, sculptures, and rare museum-grade artifacts'],
+            ['3', 'Vehicles', 'vehicles', 'High-performance and collector automobiles'],
+            ['4', 'Cameras', 'cameras', 'Film and digital cameras, lenses, and accessories']
+          ]
+        }
+      },
+      item: {
+        title: 'TABLE 3: ITEM (Consigned Lot Master Specification)',
+        badge: '3NF Verified',
+        summary: 'Physical consignment master entity. Represents physical goods independently of temporary commercial auction instances, preserving consignment history.',
+        proof: 'Decoupling ITEM from AUCTION eliminates update anomalies. Attributes describe physical goods (condition, location, provenance) rather than auction pricing parameters.',
+        columns: [
+          { name: 'item_id', type: 'INT', constraints: 'PK, AUTO_INCREMENT', desc: 'Surrogate primary key for the consigned item.' },
+          { name: 'seller_id', type: 'INT', constraints: 'FK → USERS(user_id), NOT NULL', desc: 'Foreign key to the seller who owns the physical lot.' },
+          { name: 'category_id', type: 'INT', constraints: 'FK → CATEGORY(category_id), NOT NULL', desc: 'Foreign key establishing departmental classification.' },
+          { name: 'title', type: 'VARCHAR(255)', constraints: 'NOT NULL', desc: 'Editorial catalog lot title.' },
+          { name: 'condition_type', type: 'VARCHAR(50)', constraints: 'NOT NULL', desc: 'Physical condition rating (New, Excellent, Very good, Good, Fair).' },
+          { name: 'location', type: 'VARCHAR(100)', constraints: 'NOT NULL', desc: 'Physical consignment vault or provenance origin city.' },
+          { name: 'image_url', type: 'TEXT', constraints: 'NULL', desc: 'High-resolution photographic asset URL or placeholder reference.' },
+          { name: 'description', type: 'TEXT', constraints: 'NULL', desc: 'Comprehensive provenance, dimensions, and condition report.' },
+          { name: 'created_at', type: 'TIMESTAMP', constraints: 'DEFAULT CURRENT_TIMESTAMP', desc: 'Consignment intake timestamp.' }
+        ],
+        ddl: `CREATE TABLE item (
+    item_id INT AUTO_INCREMENT,
+    seller_id INT NOT NULL,
+    category_id INT NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    condition_type VARCHAR(50) NOT NULL,
+    location VARCHAR(100) NOT NULL DEFAULT 'Mumbai, Maharashtra',
+    image_url TEXT,
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_item PRIMARY KEY (item_id),
+    CONSTRAINT fk_item_seller FOREIGN KEY (seller_id) REFERENCES users(user_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_item_category FOREIGN KEY (category_id) REFERENCES category(category_id) ON DELETE RESTRICT,
+    INDEX idx_item_seller (seller_id),
+    INDEX idx_item_category (category_id),
+    FULLTEXT INDEX idx_item_search (title, description)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        relations: [
+          'N : 1 with USERS — Multiple consigned items belong to one consignor (seller_id).',
+          'N : 1 with CATEGORY — Multiple items belong to one category (category_id).',
+          '1 : 1 with AUCTION — Each physical item corresponds to an auction lot instance (AUCTION.item_id).'
+        ],
+        sample: {
+          headers: ['item_id', 'seller_id', 'category_id', 'title', 'condition_type', 'location'],
+          rows: [
+            ['1', '3', '1', 'The Genesis Chronograph 1984', 'Excellent', 'Mumbai, Maharashtra'],
+            ['2', '3', '2', 'Dutch Masters Floral Still Life (c. 1675)', 'Good', 'Pune, Maharashtra'],
+            ['3', '3', '3', 'Porsche Panamera Turbo Executive Edition', 'Very good', 'Mumbai, Maharashtra'],
+            ['7', '7', '6', 'harry potter books', 'Excellent', 'Mumbai, Maharashtra']
+          ]
+        }
+      },
+      auction: {
+        title: 'TABLE 4: AUCTION (Temporal Bidding Instances & Limits)',
+        badge: '3NF Verified',
+        summary: 'Commercial transaction parameters, timing boundaries, reserve thresholds, and live high-bid state. Managed by the 30-second expiry daemon.',
+        proof: 'Maintains 3NF by storing temporal pricing metrics separately from physical lot attributes. winner_id is populated only upon conclusion.',
+        columns: [
+          { name: 'auction_id', type: 'INT', constraints: 'PK, AUTO_INCREMENT', desc: 'Primary key identifying the auction session.' },
+          { name: 'item_id', type: 'INT', constraints: 'FK → ITEM(item_id), UNIQUE, NOT NULL', desc: 'Foreign key linking the physical consignment.' },
+          { name: 'starting_price', type: 'DECIMAL(12,2)', constraints: 'NOT NULL', desc: 'Opening ask price in INR ₹.' },
+          { name: 'reserve_price', type: 'DECIMAL(12,2)', constraints: 'NOT NULL', desc: 'Confidential minimum hammer price required for sale.' },
+          { name: 'min_increment', type: 'DECIMAL(10,2)', constraints: 'DEFAULT 100.00', desc: 'Minimum amount a new bid must exceed the current high bid.' },
+          { name: 'current_bid', type: 'DECIMAL(12,2)', constraints: 'DEFAULT 0.00', desc: 'Denormalized current highest bid (cached for fast reads).' },
+          { name: 'bid_count', type: 'INT UNSIGNED', constraints: 'DEFAULT 0', desc: 'Total count of valid bids recorded.' },
+          { name: 'winner_id', type: 'INT', constraints: 'FK → USERS(user_id), NULL', desc: 'Designated winner once closed with reserve met.' },
+          { name: 'status', type: "ENUM('Active','Closed','Cancelled')", constraints: "DEFAULT 'Active'", desc: 'Lifecycle state of the auction.' },
+          { name: 'start_time', type: 'DATETIME', constraints: 'NOT NULL', desc: 'Exact date and time bidding opens.' },
+          { name: 'end_time', type: 'DATETIME', constraints: 'NOT NULL', desc: 'Exact date and time bidding closes.' }
+        ],
+        ddl: `CREATE TABLE auction (
+    auction_id INT AUTO_INCREMENT,
+    item_id INT NOT NULL,
+    starting_price DECIMAL(12,2) NOT NULL,
+    reserve_price DECIMAL(12,2) NOT NULL,
+    min_increment DECIMAL(10,2) NOT NULL DEFAULT 100.00,
+    current_bid DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    bid_count INT UNSIGNED NOT NULL DEFAULT 0,
+    winner_id INT NULL,
+    status ENUM('Active', 'Closed', 'Cancelled') NOT NULL DEFAULT 'Active',
+    start_time DATETIME NOT NULL,
+    end_time DATETIME NOT NULL,
+    CONSTRAINT pk_auction PRIMARY KEY (auction_id),
+    CONSTRAINT uq_auction_item UNIQUE (item_id),
+    CONSTRAINT fk_auction_item FOREIGN KEY (item_id) REFERENCES item(item_id) ON DELETE CASCADE,
+    CONSTRAINT fk_auction_winner FOREIGN KEY (winner_id) REFERENCES users(user_id) ON DELETE SET NULL,
+    CONSTRAINT chk_auction_reserve CHECK (reserve_price >= starting_price),
+    CONSTRAINT chk_auction_time CHECK (end_time > start_time),
+    INDEX idx_auction_status_endtime (status, end_time),
+    INDEX idx_auction_winner (winner_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        relations: [
+          '1 : 1 with ITEM — One auction session per physical item consignment.',
+          '1 : N with BID — One auction receives multiple competing bids (BID.auction_id → AUCTION.auction_id).',
+          '1 : 1 with PAYMENT — Generates one settlement transaction upon closing (PAYMENT.auction_id).'
+        ],
+        sample: {
+          headers: ['auction_id', 'item_id', 'starting_price', 'current_bid', 'min_increment', 'bid_count', 'status'],
+          rows: [
+            ['1', '1', '₹65,000', '₹72,000', '₹1,000', '18', 'Active'],
+            ['2', '2', '₹15,000', '₹18,500', '₹500', '12', 'Active'],
+            ['3', '3', '₹150,000', '₹168,000', '₹2,000', '9', 'Active'],
+            ['7', '7', '₹5,000', '₹5,000', '₹100', '0', 'Active']
+          ]
+        }
+      },
+      bid: {
+        title: 'TABLE 5: BID (Atomic Offer Transactions)',
+        badge: '3NF Verified',
+        summary: 'Append-only ledger of every monetary bid submitted. Evaluated atomically through row locks and trg_bid_validate.',
+        proof: 'Immutable transactional entity. Every bid is uniquely identified by bid_id. Timestamp has millisecond precision to resolve concurrency ties.',
+        columns: [
+          { name: 'bid_id', type: 'BIGINT', constraints: 'PK, AUTO_INCREMENT', desc: 'Surrogate primary key for the individual bid transaction.' },
+          { name: 'auction_id', type: 'INT', constraints: 'FK → AUCTION(auction_id), NOT NULL', desc: 'Target auction receiving the offer.' },
+          { name: 'bidder_id', type: 'INT', constraints: 'FK → USERS(user_id), NOT NULL', desc: 'Member submitting the monetary offer.' },
+          { name: 'amount', type: 'DECIMAL(12,2)', constraints: 'NOT NULL', desc: 'Gross bid amount in INR ₹.' },
+          { name: 'bid_time', type: 'TIMESTAMP(3)', constraints: 'DEFAULT CURRENT_TIMESTAMP(3)', desc: 'High-resolution millisecond timestamp for tie-breaking.' },
+          { name: 'is_winning', type: 'BOOLEAN', constraints: 'DEFAULT FALSE', desc: 'Flag indicating whether this bid was the high offer when placed.' },
+          { name: 'ip_address', type: 'VARCHAR(45)', constraints: 'NULL', desc: 'IPv4 or IPv6 client network origin for fraud prevention.' }
+        ],
+        ddl: `CREATE TABLE bid (
+    bid_id BIGINT AUTO_INCREMENT,
+    auction_id INT NOT NULL,
+    bidder_id INT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    bid_time TIMESTAMP(3) DEFAULT CURRENT_TIMESTAMP(3),
+    is_winning BOOLEAN NOT NULL DEFAULT FALSE,
+    ip_address VARCHAR(45) NULL,
+    CONSTRAINT pk_bid PRIMARY KEY (bid_id),
+    CONSTRAINT fk_bid_auction FOREIGN KEY (auction_id) REFERENCES auction(auction_id) ON DELETE CASCADE,
+    CONSTRAINT fk_bid_bidder FOREIGN KEY (bidder_id) REFERENCES users(user_id) ON DELETE RESTRICT,
+    INDEX idx_bid_auction_amount (auction_id, amount DESC),
+    INDEX idx_bid_bidder (bidder_id),
+    INDEX idx_bid_time (bid_time)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        relations: [
+          'N : 1 with AUCTION — Multiple bids are submitted against one auction.',
+          'N : 1 with USERS — Multiple bids are placed by one member account.'
+        ],
+        sample: {
+          headers: ['bid_id', 'auction_id', 'bidder_id', 'amount', 'bid_time', 'is_winning'],
+          rows: [
+            ['101', '1', '2', '₹70,000', '2026-10-20 04:15:22.102', 'FALSE'],
+            ['102', '1', '4', '₹71,000', '2026-10-20 04:45:10.519', 'FALSE'],
+            ['103', '1', '2', '₹72,000', '2026-10-20 05:10:04.882', 'TRUE']
+          ]
+        }
+      },
+      payment: {
+        title: 'TABLE 6: PAYMENT (48-Hour Settlement Ledger)',
+        badge: '3NF Verified',
+        summary: 'Post-auction financial settlement obligations. Automatically generated by the closing daemon when the reserve price is satisfied.',
+        proof: 'Separates payment settlement lifecycle from auction lifecycle. Tracks transaction confirmation reference, settlement deadline, and payment status.',
+        columns: [
+          { name: 'payment_id', type: 'INT', constraints: 'PK, AUTO_INCREMENT', desc: 'Primary key identifying the payment obligation.' },
+          { name: 'auction_id', type: 'INT', constraints: 'FK → AUCTION(auction_id), UNIQUE, NOT NULL', desc: 'Foreign key to the settled auction lot.' },
+          { name: 'payer_id', type: 'INT', constraints: 'FK → USERS(user_id), NOT NULL', desc: 'Winning buyer obligated to remit funds.' },
+          { name: 'amount', type: 'DECIMAL(12,2)', constraints: 'NOT NULL', desc: 'Final hammer amount in INR ₹.' },
+          { name: 'payment_status', type: "ENUM('Pending','Paid','Failed')", constraints: "DEFAULT 'Pending'", desc: 'Settlement state.' },
+          { name: 'deadline_at', type: 'DATETIME', constraints: 'NOT NULL', desc: 'Strict 48-hour settlement cutoff time.' },
+          { name: 'transaction_ref', type: 'VARCHAR(100)', constraints: 'NULL', desc: 'Bank or gateway settlement reference code.' },
+          { name: 'paid_at', type: 'TIMESTAMP', constraints: 'NULL', desc: 'UTC timestamp of confirmed settlement.' }
+        ],
+        ddl: `CREATE TABLE payment (
+    payment_id INT AUTO_INCREMENT,
+    auction_id INT NOT NULL,
+    payer_id INT NOT NULL,
+    amount DECIMAL(12,2) NOT NULL,
+    payment_status ENUM('Pending', 'Paid', 'Failed') NOT NULL DEFAULT 'Pending',
+    deadline_at DATETIME NOT NULL,
+    transaction_ref VARCHAR(100) NULL,
+    paid_at TIMESTAMP NULL,
+    CONSTRAINT pk_payment PRIMARY KEY (payment_id),
+    CONSTRAINT uq_payment_auction UNIQUE (auction_id),
+    CONSTRAINT fk_payment_auction FOREIGN KEY (auction_id) REFERENCES auction(auction_id) ON DELETE RESTRICT,
+    CONSTRAINT fk_payment_payer FOREIGN KEY (payer_id) REFERENCES users(user_id) ON DELETE RESTRICT,
+    INDEX idx_payment_status (payment_status),
+    INDEX idx_payment_deadline (deadline_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        relations: [
+          '1 : 1 with AUCTION — Each won auction generates exactly one payment obligation.',
+          'N : 1 with USERS — One buyer may remit payment for multiple won lots.'
+        ],
+        sample: {
+          headers: ['payment_id', 'auction_id', 'payer_id', 'amount', 'status', 'deadline_at'],
+          rows: [
+            ['501', '2', '2', '₹18,500', 'Pending', '2026-10-22 17:30:00'],
+            ['502', '4', '2', '₹6,200', 'Paid', '2026-10-21 09:15:00']
+          ]
+        }
+      },
+      watchlist: {
+        title: 'TABLE 7: WATCHLIST (Member Preference M:N Junction)',
+        badge: '3NF Verified',
+        summary: 'Deconstructs the Many-to-Many relationship between USERS (buyers) and AUCTIONS (lots) into pure 3NF.',
+        proof: 'Composite primary key (user_id, auction_id) prevents duplicate saves. Foreign keys feature ON DELETE CASCADE to guarantee zero orphaned records.',
+        columns: [
+          { name: 'user_id', type: 'INT', constraints: 'PK, FK → USERS(user_id)', desc: 'Foreign key to the member saving the lot.' },
+          { name: 'auction_id', type: 'INT', constraints: 'PK, FK → AUCTION(auction_id)', desc: 'Foreign key to the saved auction lot.' },
+          { name: 'created_at', type: 'TIMESTAMP', constraints: 'DEFAULT CURRENT_TIMESTAMP', desc: 'Timestamp when the lot was bookmarked.' }
+        ],
+        ddl: `CREATE TABLE watchlist (
+    user_id INT NOT NULL,
+    auction_id INT NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_watchlist PRIMARY KEY (user_id, auction_id),
+    CONSTRAINT fk_watchlist_user FOREIGN KEY (user_id) REFERENCES users(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_watchlist_auction FOREIGN KEY (auction_id) REFERENCES auction(auction_id) ON DELETE CASCADE,
+    INDEX idx_watchlist_auction (auction_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        relations: [
+          'Resolves M : N relationship between USERS and AUCTION into two 1 : N foreign key relations.'
+        ],
+        sample: {
+          headers: ['user_id', 'auction_id', 'created_at'],
+          rows: [
+            ['2', '1', '2026-10-20 04:12:00'],
+            ['2', '3', '2026-10-20 04:14:15'],
+            ['7', '2', '2026-10-20 05:02:40']
+          ]
+        }
+      },
+      audit_log: {
+        title: 'TABLE 8: AUDIT_LOG (Immutable Administrative & Security Ledger)',
+        badge: '3NF Verified',
+        summary: 'Write-only compliance and forensics ledger. Records every sensitive action: bids, listing creation, user blocking, and cancellations.',
+        proof: 'Append-only ledger. Nullable foreign keys ensure log records persist even if an underlying auction or user account is later purged or blocked.',
+        columns: [
+          { name: 'log_id', type: 'BIGINT', constraints: 'PK, AUTO_INCREMENT', desc: 'Surrogate sequence identifier for the audit event.' },
+          { name: 'event_type', type: 'VARCHAR(50)', constraints: 'NOT NULL', desc: 'Action type: REGISTER, LOGIN, PLACE_BID, CREATE_LISTING, BLOCK_USER, CANCEL_AUCTION.' },
+          { name: 'user_id', type: 'INT', constraints: 'NULL', desc: 'Actor ID who triggered the transaction.' },
+          { name: 'auction_id', type: 'INT', constraints: 'NULL', desc: 'Target auction entity affected (if applicable).' },
+          { name: 'summary', type: 'TEXT', constraints: 'NOT NULL', desc: 'Structured narrative of the event and parameters.' },
+          { name: 'ip_address', type: 'VARCHAR(45)', constraints: 'NULL', desc: 'Client network origin IP.' },
+          { name: 'created_at', type: 'TIMESTAMP', constraints: 'DEFAULT CURRENT_TIMESTAMP', desc: 'Immutable UTC event record timestamp.' }
+        ],
+        ddl: `CREATE TABLE audit_log (
+    log_id BIGINT AUTO_INCREMENT,
+    event_type VARCHAR(50) NOT NULL,
+    user_id INT NULL,
+    auction_id INT NULL,
+    summary TEXT NOT NULL,
+    ip_address VARCHAR(45) NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT pk_audit_log PRIMARY KEY (log_id),
+    INDEX idx_audit_event (event_type),
+    INDEX idx_audit_user (user_id),
+    INDEX idx_audit_created (created_at DESC)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;`,
+        relations: [
+          'Independent audit trail with loose coupling to prevent cascading deletions of historical evidence.'
+        ],
+        sample: {
+          headers: ['log_id', 'event_type', 'user_id', 'auction_id', 'summary', 'created_at'],
+          rows: [
+            ['1001', 'CREATE_LISTING', '3', '1', 'Created listing #1: The Genesis Chronograph 1984', '2026-10-20 03:00:00'],
+            ['1002', 'PLACE_BID', '2', '1', 'Bid placed: ₹72,000 on auction #1', '2026-10-20 05:10:04'],
+            ['1003', 'BLOCK_USER', '1', 'NULL', 'Admin blocked user #9 for suspicious bidding', '2026-10-20 05:15:30']
+          ]
+        }
+      }
+    },
+    triggers: {
+      trg_bid_validate: {
+        title: 'TRIGGER 1: trg_bid_validate (BEFORE INSERT ON BID)',
+        event: 'BEFORE INSERT ON BID',
+        purpose: 'Atomic pre-execution validation. Guarantees monotonic bid progression, enforces minimum increments, rejects closed auctions, and prevents seller self-bidding directly in the database engine.',
+        sql: `DELIMITER $$
+CREATE TRIGGER trg_bid_validate
+BEFORE INSERT ON bid
+FOR EACH ROW
+BEGIN
+    DECLARE v_current_bid DECIMAL(12,2);
+    DECLARE v_min_increment DECIMAL(10,2);
+    DECLARE v_status VARCHAR(20);
+    DECLARE v_seller_id INT;
+    DECLARE v_end_time DATETIME;
+
+    -- Lock the target auction row exclusively to eliminate race conditions
+    SELECT a.current_bid, a.min_increment, a.status, a.end_time, i.seller_id
+    INTO v_current_bid, v_min_increment, v_status, v_end_time, v_seller_id
+    FROM auction a
+    JOIN item i ON a.item_id = i.item_id
+    WHERE a.auction_id = NEW.auction_id
+    FOR UPDATE;
+
+    -- Rule 1: Auction must be currently Active and unexpired
+    IF v_status != 'Active' OR NOW() > v_end_time THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Bidding Error: Auction is closed or expired.';
+    END IF;
+
+    -- Rule 2: Prevent seller from bidding on their own consigned item
+    IF NEW.bidder_id = v_seller_id THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Bidding Error: Sellers cannot bid on their own consignments.';
+    END IF;
+
+    -- Rule 3: Enforce strict minimum bid increment
+    IF NEW.amount < (v_current_bid + v_min_increment) THEN
+        SIGNAL SQLSTATE '45000'
+        SET MESSAGE_TEXT = 'Bidding Error: Bid does not satisfy minimum increment threshold.';
+    END IF;
+
+    -- Mark this bid as the winning bid
+    SET NEW.is_winning = TRUE;
+END$$
+DELIMITER ;`
+      },
+      trg_bid_audit: {
+        title: 'TRIGGER 2: trg_bid_audit (AFTER INSERT ON BID)',
+        event: 'AFTER INSERT ON BID',
+        purpose: 'Atomic state maintenance and ledger synchronization. Updates the current highest bid in AUCTION, increments the bid counter, flags prior bids as outbid, and writes an immutable entry into AUDIT_LOG.',
+        sql: `DELIMITER $$
+CREATE TRIGGER trg_bid_audit
+AFTER INSERT ON bid
+FOR EACH ROW
+BEGIN
+    -- Flag previous winning bids for this auction as outbid
+    UPDATE bid
+    SET is_winning = FALSE
+    WHERE auction_id = NEW.auction_id AND bid_id != NEW.bid_id;
+
+    -- Atomically advance auction high bid and increment bid counter
+    UPDATE auction
+    SET current_bid = NEW.amount,
+        bid_count = bid_count + 1
+    WHERE auction_id = NEW.auction_id;
+
+    -- Automatically append an immutable entry to the audit log
+    INSERT INTO audit_log (event_type, user_id, auction_id, summary, ip_address)
+    VALUES (
+        'PLACE_BID',
+        NEW.bidder_id,
+        NEW.auction_id,
+        CONCAT('Atomic bid placed: ₹', FORMAT(NEW.amount, 2), ' on auction lot #', NEW.auction_id),
+        NEW.ip_address
+    );
+END$$
+DELIMITER ;`
+      },
+      sp_close_expired_auctions: {
+        title: 'PROCEDURE: sp_close_expired_auctions (Automated Expiry Sweeper)',
+        event: 'STORED PROCEDURE / EVENT SCHEDULER',
+        purpose: 'Periodic transaction daemon called every 30 seconds. Identifies past-due active auctions, evaluates reserve price thresholds, designates winning bidders, and creates 48-hour payment settlement obligations.',
+        sql: `DELIMITER $$
+CREATE PROCEDURE sp_close_expired_auctions()
+BEGIN
+    DECLARE done INT DEFAULT FALSE;
+    DECLARE v_auction_id INT;
+    DECLARE v_current_bid DECIMAL(12,2);
+    DECLARE v_reserve_price DECIMAL(12,2);
+    DECLARE v_winner_id INT;
+
+    -- Cursor iterating through all expired active auctions
+    DECLARE cur_expired CURSOR FOR
+        SELECT a.auction_id, a.current_bid, a.reserve_price, b.bidder_id
+        FROM auction a
+        LEFT JOIN bid b ON a.auction_id = b.auction_id AND b.is_winning = TRUE
+        WHERE a.status = 'Active' AND a.end_time <= NOW()
+        FOR UPDATE;
+
+    DECLARE CONTINUE HANDLER FOR NOT FOUND SET done = TRUE;
+
+    START TRANSACTION;
+
+    OPEN cur_expired;
+    read_loop: LOOP
+        FETCH cur_expired INTO v_auction_id, v_current_bid, v_reserve_price, v_winner_id;
+        IF done THEN
+            LEAVE read_loop;
+        END IF;
+
+        -- Check if reserve price was met
+        IF v_winner_id IS NOT NULL AND v_current_bid >= v_reserve_price THEN
+            -- Auction sold! Mark Closed and set Winner
+            UPDATE auction
+            SET status = 'Closed', winner_id = v_winner_id
+            WHERE auction_id = v_auction_id;
+
+            -- Generate 48-hour payment settlement obligation
+            INSERT INTO payment (auction_id, payer_id, amount, payment_status, deadline_at)
+            VALUES (v_auction_id, v_winner_id, v_current_bid, 'Pending', DATE_ADD(NOW(), INTERVAL 48 HOUR));
+
+            INSERT INTO audit_log (event_type, user_id, auction_id, summary)
+            VALUES ('AUCTION_WON', v_winner_id, v_auction_id, CONCAT('Lot #', v_auction_id, ' sold for ₹', FORMAT(v_current_bid, 2)));
+        ELSE
+            -- Reserve not met or no bids placed: Mark Closed with no sale
+            UPDATE auction
+            SET status = 'Closed', winner_id = NULL
+            WHERE auction_id = v_auction_id;
+
+            INSERT INTO audit_log (event_type, auction_id, summary)
+            VALUES ('RESERVE_UNMET', v_auction_id, CONCAT('Lot #', v_auction_id, ' closed without sale (reserve unmet).'));
+        END IF;
+    END LOOP;
+
+    CLOSE cur_expired;
+    COMMIT;
+END$$
+DELIMITER ;`
+      }
+    },
+    views: {
+      active_auctions_view: {
+        title: 'VIEW 1: active_auctions_view (Real-Time Catalog Query)',
+        purpose: 'Provides a single high-performance query endpoint for all active auctions. Performs relational joins across AUCTION, ITEM, CATEGORY, and USERS, eliminating repeated complex joins on every catalog search.',
+        sql: `CREATE OR REPLACE VIEW active_auctions_view AS
+SELECT 
+    a.auction_id,
+    i.item_id,
+    i.title,
+    c.name AS category_name,
+    c.slug AS category_slug,
+    i.condition_type,
+    i.location,
+    i.image_url,
+    i.description,
+    a.starting_price,
+    a.current_bid,
+    a.min_increment,
+    a.bid_count,
+    a.end_time,
+    TIMESTAMPDIFF(SECOND, NOW(), a.end_time) AS seconds_remaining,
+    u.name AS seller_name,
+    u.user_id AS seller_id
+FROM auction a
+JOIN item i ON a.item_id = i.item_id
+JOIN category c ON i.category_id = c.category_id
+JOIN users u ON i.seller_id = u.user_id
+WHERE a.status = 'Active' AND a.end_time > NOW();`,
+        query: `SELECT * FROM active_auctions_view 
+WHERE category_slug = 'fine-watches' 
+ORDER BY current_bid DESC;`
+      },
+      user_bidding_activity_view: {
+        title: 'VIEW 2: user_bidding_activity_view (Member Analytics Ledger)',
+        purpose: 'Aggregates bidding metrics per registered user: total bids submitted, unique auctions participated in, currently winning lots, and total monetary exposure.',
+        sql: `CREATE OR REPLACE VIEW user_bidding_activity_view AS
+SELECT 
+    u.user_id,
+    u.name AS bidder_name,
+    u.email,
+    u.role,
+    u.status,
+    COUNT(b.bid_id) AS total_bids_submitted,
+    COUNT(DISTINCT b.auction_id) AS auctions_participated,
+    SUM(CASE WHEN b.is_winning = TRUE THEN 1 ELSE 0 END) AS currently_winning_lots,
+    COALESCE(SUM(CASE WHEN b.is_winning = TRUE THEN b.amount ELSE 0 END), 0) AS total_winning_exposure
+FROM users u
+LEFT JOIN bid b ON u.user_id = b.bidder_id
+GROUP BY u.user_id, u.name, u.email, u.role, u.status;`,
+        query: `SELECT * FROM user_bidding_activity_view 
+WHERE total_bids_submitted > 0 
+ORDER BY total_winning_exposure DESC;`
+      },
+      category_revenue_summary_view: {
+        title: 'VIEW 3: category_revenue_summary_view (Departmental Performance)',
+        purpose: 'Computes department-level performance metrics: active lots, total sold volume (gross merchandise value), average hammer price, and clearance rate.',
+        sql: `CREATE OR REPLACE VIEW category_revenue_summary_view AS
+SELECT 
+    c.category_id,
+    c.name AS category_name,
+    COUNT(DISTINCT i.item_id) AS total_consignments,
+    SUM(CASE WHEN a.status = 'Active' THEN 1 ELSE 0 END) AS active_lots_count,
+    SUM(CASE WHEN a.status = 'Closed' AND a.winner_id IS NOT NULL THEN 1 ELSE 0 END) AS sold_lots_count,
+    COALESCE(SUM(CASE WHEN a.status = 'Closed' AND a.winner_id IS NOT NULL THEN a.current_bid ELSE 0 END), 0) AS gross_merchandise_value,
+    COALESCE(AVG(CASE WHEN a.status = 'Closed' AND a.winner_id IS NOT NULL THEN a.current_bid ELSE NULL END), 0) AS avg_hammer_price
+FROM category c
+LEFT JOIN item i ON c.category_id = i.category_id
+LEFT JOIN auction a ON i.item_id = a.item_id
+GROUP BY c.category_id, c.name;`,
+        query: `SELECT * FROM category_revenue_summary_view 
+ORDER BY gross_merchandise_value DESC;`
+      }
+    },
+    acid: {
+      atomicity: {
+        title: 'A — ATOMICITY (All-or-Nothing Transactions)',
+        summary: 'Every bid evaluation, counter update, and payment record runs within an atomic boundary (START TRANSACTION ... COMMIT). If a bid fails any condition, the transaction executes ROLLBACK, guaranteeing zero partial writes.',
+        details: `In high-concurrency auctions, a bid cannot be half-placed. The system executes three operations atomically:
+1. Validate incoming amount >= current_bid + min_increment.
+2. Advance AUCTION.current_bid and increment AUCTION.bid_count.
+3. Record new row in BID and log to AUDIT_LOG.
+
+If an error or network drop occurs between step 2 and 3, MySQL InnoDB automatically executes ROLLBACK, returning the database to its pristine state before step 1.`
+      },
+      consistency: {
+        title: 'C — CONSISTENCY (Schema Constraints & Triggers)',
+        summary: 'Enforces relational integrity, domain invariants, and mathematical validity through declarative constraints and triggers.',
+        details: `Database consistency is guaranteed through:
+• Declarative Foreign Keys: Cascading deletions on dependent junction rows (WATCHLIST), while restricting seller deletion if active consignments exist (ON DELETE RESTRICT).
+• Check Constraints: CHECK (reserve_price >= starting_price) and CHECK (end_time > start_time) enforced at the DDL level.
+• Domain Enums: Restricting status to 'Active', 'Closed', 'Cancelled'.
+• Business Trigger trg_bid_validate: Prohibits sellers from bidding on their own lots and enforces minimum increments directly in the storage engine.`
+      },
+      isolation: {
+        title: 'I — ISOLATION (Pessimistic Row Locks & MVCC)',
+        summary: 'Prevents race conditions and dirty reads when multiple users bid simultaneously within the exact same millisecond.',
+        details: `To eliminate race conditions:
+• InnoDB Pessimistic Row Lock (SELECT ... FOR UPDATE): When a bid transaction opens, the target row in AUCTION is locked with an exclusive write lock. Competing transactions for the same lot are queued sequentially.
+• Serializable / Read Committed Isolation: Eliminates non-repeatable reads and dirty reads.
+• Optimistic Timestamp Tie-Breaking: High-resolution millisecond timestamps (TIMESTAMP(3)) resolve any concurrent arrival ordering with strict deterministic precedence.`
+      },
+      durability: {
+        title: 'D — DURABILITY (Write-Ahead Logging & Redo Logs)',
+        summary: 'Guarantees that committed bids and won lots survive server restarts, power failures, or crashes.',
+        details: `InnoDB achieves durability through:
+• Write-Ahead Logging (WAL): Changes are written sequentially to the InnoDB Redo Log buffer and flushed to non-volatile disk upon COMMIT.
+• Doublewrite Buffer: Protects against partial page writes during power loss.
+• ACID Assurance: Once a buyer receives the HTTP 201 'Bid accepted' acknowledgment, the state is permanently written to physical disk storage.`
+      }
+    }
+  };
+
+  function openArchModal(category, key) {
+    const modal = document.getElementById('arch-detail-modal');
+    const titleEl = document.getElementById('arch-modal-title');
+    const bodyEl = document.getElementById('arch-modal-body');
+    if (!modal || !titleEl || !bodyEl) return;
+
+    const data = ARCH_DATA[category]?.[key];
+    if (!data) return;
+
+    titleEl.textContent = data.title || 'Specification Details';
+
+    let html = '';
+    if (category === 'entities') {
+      html = `
+        <div class="arch-detail-section">
+          <h4>📋 Entity Overview & Normalization</h4>
+          <p>${escapeHtml(data.summary)}</p>
+          <div style="background:#f4f4f8; padding:10px 14px; border-left:4px solid #350AFF; font-size:12px; margin-top:8px;">
+            <strong>3NF Verification:</strong> ${escapeHtml(data.proof)}
+          </div>
+        </div>
+
+        <div class="arch-detail-section">
+          <h4>🔑 Column & Constraint Specification</h4>
+          <table class="arch-spec-table">
+            <thead>
+              <tr>
+                <th style="width:20%;">Column</th>
+                <th style="width:22%;">Type</th>
+                <th style="width:25%;">Constraints</th>
+                <th style="width:33%;">Description</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${data.columns.map(c => `
+                <tr>
+                  <td><code>${escapeHtml(c.name)}</code></td>
+                  <td><code>${escapeHtml(c.type)}</code></td>
+                  <td><span style="font-weight:600; color:#350AFF;">${escapeHtml(c.constraints)}</span></td>
+                  <td>${escapeHtml(c.desc)}</td>
+                </tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+
+        <div class="arch-detail-section">
+          <h4>💾 Production MySQL 8.0 DDL (Executable)</h4>
+          <pre class="arch-sql-box"><code>${escapeHtml(data.ddl)}</code></pre>
+        </div>
+
+        <div class="arch-detail-section">
+          <h4>🔗 Relational Foreign Key Mappings</h4>
+          <ul style="padding-left:20px; font-size:13px; margin-top:6px;">
+            ${data.relations.map(r => `<li>${escapeHtml(r)}</li>`).join('')}
+          </ul>
+        </div>
+
+        <div class="arch-detail-section">
+          <h4>🧪 Live Sample Data Tuples</h4>
+          <table class="arch-spec-table">
+            <thead>
+              <tr>${data.sample.headers.map(h => `<th>${escapeHtml(h)}</th>`).join('')}</tr>
+            </thead>
+            <tbody>
+              ${data.sample.rows.map(row => `
+                <tr>${row.map(cell => `<td>${escapeHtml(cell)}</td>`).join('')}</tr>
+              `).join('')}
+            </tbody>
+          </table>
+        </div>
+      `;
+    } else if (category === 'triggers') {
+      html = `
+        <div class="arch-detail-section">
+          <h4>⚙️ Trigger / Procedure Overview</h4>
+          <p><strong>Event:</strong> <code>${escapeHtml(data.event)}</code></p>
+          <p>${escapeHtml(data.purpose)}</p>
+        </div>
+        <div class="arch-detail-section">
+          <h4>💾 Executable SQL Code</h4>
+          <pre class="arch-sql-box"><code>${escapeHtml(data.sql)}</code></pre>
+        </div>
+      `;
+    } else if (category === 'views') {
+      html = `
+        <div class="arch-detail-section">
+          <h4>📊 Analytical View Purpose</h4>
+          <p>${escapeHtml(data.purpose)}</p>
+        </div>
+        <div class="arch-detail-section">
+          <h4>💾 View DDL Definition</h4>
+          <pre class="arch-sql-box"><code>${escapeHtml(data.sql)}</code></pre>
+        </div>
+        <div class="arch-detail-section">
+          <h4>🔎 Sample Query Execution</h4>
+          <pre class="arch-sql-box"><code>${escapeHtml(data.query)}</code></pre>
+        </div>
+      `;
+    } else if (category === 'acid') {
+      html = `
+        <div class="arch-detail-section">
+          <h4>🛡️ Architectural Principle</h4>
+          <p style="font-size:15px; font-weight:600; color:#350AFF;">${escapeHtml(data.summary)}</p>
+        </div>
+        <div class="arch-detail-section">
+          <h4>🔧 Technical Implementation Details</h4>
+          <div style="background:#f7f7fa; padding:14px; border:1px solid #e0e0e5; border-radius:6px; font-size:13px; line-height:1.7; white-space:pre-wrap;">${escapeHtml(data.details)}</div>
+        </div>
+      `;
+    }
+
+    bodyEl.innerHTML = html;
+    modal.classList.add('is-open');
+    modal.setAttribute('aria-hidden', 'false');
+    document.body.style.overflow = 'hidden';
+  }
+
+  function closeArchModal() {
+    const modal = document.getElementById('arch-detail-modal');
+    if (!modal) return;
+    modal.classList.remove('is-open');
+    modal.setAttribute('aria-hidden', 'true');
+    document.body.style.overflow = '';
+  }
+
   function renderDbmsTab(tabName) {
     const wrap = document.getElementById('arch-tab-content');
     if (!wrap) return;
@@ -836,8 +1553,11 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
 
     if (tabName === 'schema') {
       wrap.innerHTML = `
+        <div style="margin-bottom:14px; font-size:13px; color:#555;">
+          ✦ <strong>Interactive Relational Schema (3NF)</strong> — Click or tap any table below to inspect its full column specifications, integrity constraints, foreign key mappings, and executable MySQL 8.0 DDL.
+        </div>
         <div class="schema-entities-grid">
-          <div class="schema-entity-card">
+          <div class="schema-entity-card" data-arch-type="entities" data-arch-key="users">
             <div class="schema-entity-header"><span>1. USERS</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> user_id INT AUTO_INCREMENT<br/>
@@ -848,8 +1568,9 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
               status ENUM('Active','Blocked') DEFAULT 'Active'<br/>
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
-          <div class="schema-entity-card">
+          <div class="schema-entity-card" data-arch-type="entities" data-arch-key="category">
             <div class="schema-entity-header"><span>2. CATEGORY</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> category_id INT AUTO_INCREMENT<br/>
@@ -857,8 +1578,9 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
               slug VARCHAR(100) UNIQUE NOT NULL<br/>
               description TEXT
             </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
-          <div class="schema-entity-card">
+          <div class="schema-entity-card" data-arch-type="entities" data-arch-key="item">
             <div class="schema-entity-header"><span>3. ITEM</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> item_id INT AUTO_INCREMENT<br/>
@@ -869,8 +1591,9 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
               location VARCHAR(100)<br/>
               image_url TEXT
             </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
-          <div class="schema-entity-card">
+          <div class="schema-entity-card" data-arch-type="entities" data-arch-key="auction">
             <div class="schema-entity-header"><span>4. AUCTION</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> auction_id INT AUTO_INCREMENT<br/>
@@ -884,8 +1607,9 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
               status ENUM('Active','Closed','Cancelled')<br/>
               end_time DATETIME NOT NULL
             </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
-          <div class="schema-entity-card">
+          <div class="schema-entity-card" data-arch-type="entities" data-arch-key="bid">
             <div class="schema-entity-header"><span>5. BID</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> bid_id BIGINT AUTO_INCREMENT<br/>
@@ -896,8 +1620,9 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
               is_winning BOOLEAN DEFAULT FALSE<br/>
               ip_address VARCHAR(45)
             </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
-          <div class="schema-entity-card">
+          <div class="schema-entity-card" data-arch-type="entities" data-arch-key="payment">
             <div class="schema-entity-header"><span>6. PAYMENT</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> payment_id INT AUTO_INCREMENT<br/>
@@ -907,8 +1632,9 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
               payment_status ENUM('Pending','Paid','Failed')<br/>
               paid_at TIMESTAMP NULL
             </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
-          <div class="schema-entity-card">
+          <div class="schema-entity-card" data-arch-type="entities" data-arch-key="watchlist">
             <div class="schema-entity-header"><span>7. WATCHLIST</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK (Composite):</strong> (user_id, auction_id)<br/>
@@ -916,8 +1642,9 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
               <strong>FK:</strong> auction_id → AUCTION(auction_id) ON DELETE CASCADE<br/>
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
-          <div class="schema-entity-card">
+          <div class="schema-entity-card" data-arch-type="entities" data-arch-key="audit_log">
             <div class="schema-entity-header"><span>8. AUDIT_LOG</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> log_id BIGINT AUTO_INCREMENT<br/>
@@ -927,87 +1654,118 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
               summary TEXT NOT NULL<br/>
               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
         </div>`;
     } else if (tabName === 'triggers') {
       wrap.innerHTML = `
-        <div class="code-sql-card">
-<span class="sql-com">-- TRIGGER: trg_bid_validate (Enforces Atomic Monotonic Bid Progression)</span>
-<span class="sql-kw">DELIMITER</span> $$
-<span class="sql-kw">CREATE TRIGGER</span> <span class="sql-fn">trg_bid_validate</span>
-<span class="sql-kw">BEFORE INSERT ON</span> BID
-<span class="sql-kw">FOR EACH ROW</span>
-<span class="sql-kw">BEGIN</span>
-    <span class="sql-kw">DECLARE</span> v_current_bid <span class="sql-kw">DECIMAL</span>(12,2);
-    <span class="sql-kw">DECLARE</span> v_min_increment <span class="sql-kw">DECIMAL</span>(10,2);
-    <span class="sql-kw">DECLARE</span> v_status <span class="sql-kw">VARCHAR</span>(20);
-    <span class="sql-kw">DECLARE</span> v_seller_id <span class="sql-kw">INT</span>;
-    <span class="sql-kw">DECLARE</span> v_end_time <span class="sql-kw">DATETIME</span>;
-
-    <span class="sql-com">-- Lock the auction row with exclusive lock to eliminate race conditions</span>
-    <span class="sql-kw">SELECT</span> a.current_bid, a.min_increment, a.status, a.end_time, i.seller_id
-    <span class="sql-kw">INTO</span> v_current_bid, v_min_increment, v_status, v_end_time, v_seller_id
-    <span class="sql-kw">FROM</span> AUCTION a
-    <span class="sql-kw">JOIN</span> ITEM i <span class="sql-kw">ON</span> a.item_id = i.item_id
-    <span class="sql-kw">WHERE</span> a.auction_id = NEW.auction_id
-    <span class="sql-kw">FOR UPDATE</span>;
-
-    <span class="sql-com">-- Constraint 1: Auction must be Active</span>
-    <span class="sql-kw">IF</span> v_status != <span class="sql-str">'Active'</span> <span class="sql-kw">OR</span> NOW() > v_end_time <span class="sql-kw">THEN</span>
-        <span class="sql-kw">SIGNAL SQLSTATE</span> <span class="sql-str">'45000'</span>
-        <span class="sql-kw">SET MESSAGE_TEXT</span> = <span class="sql-str">'Violation: Auction is closed or expired.'</span>;
-    <span class="sql-kw">END IF</span>;
-
-    <span class="sql-com">-- Constraint 2: Prevent seller from self-bidding</span>
-    <span class="sql-kw">IF</span> NEW.bidder_id = v_seller_id <span class="sql-kw">THEN</span>
-        <span class="sql-kw">SIGNAL SQLSTATE</span> <span class="sql-str">'45000'</span>
-        <span class="sql-kw">SET MESSAGE_TEXT</span> = <span class="sql-str">'Violation: Sellers cannot bid on their own items.'</span>;
-    <span class="sql-kw">END IF</span>;
-
-    <span class="sql-com">-- Constraint 3: Strict Minimum Bid Increment</span>
-    <span class="sql-kw">IF</span> NEW.amount < (v_current_bid + v_min_increment) <span class="sql-kw">THEN</span>
-        <span class="sql-kw">SIGNAL SQLSTATE</span> <span class="sql-str">'45000'</span>
-        <span class="sql-kw">SET MESSAGE_TEXT</span> = <span class="sql-str">'Violation: Bid amount does not satisfy minimum increment.'</span>;
-    <span class="sql-kw">END IF</span>;
-<span class="sql-kw">END</span>$$
-<span class="sql-kw">DELIMITER</span> ;
+        <div style="margin-bottom:14px; font-size:13px; color:#555;">
+          ✦ <strong>Automated Database Triggers & Stored Routines</strong> — Tap any card below to expand the full executable MySQL source code and rule commentary.
+        </div>
+        <div class="schema-entities-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="triggers" data-arch-key="trg_bid_validate">
+            <div class="schema-entity-header"><span>trg_bid_validate</span><span class="badge-square green">BEFORE INSERT</span></div>
+            <div class="schema-entity-fields">
+              <strong>Target Table:</strong> BID<br/>
+              <strong>Enforcement:</strong> Monotonic bid escalation, rejects closed lots, and prevents seller self-bidding directly in storage engine.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO VIEW TRIGGER SQL</span><span>↗</span></div>
+          </div>
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="triggers" data-arch-key="trg_bid_audit">
+            <div class="schema-entity-header"><span>trg_bid_audit</span><span class="badge-square green">AFTER INSERT</span></div>
+            <div class="schema-entity-fields">
+              <strong>Target Table:</strong> BID<br/>
+              <strong>Enforcement:</strong> Synchronizes AUCTION current_bid and increments counter. Appends immutable entry to AUDIT_LOG.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO VIEW TRIGGER SQL</span><span>↗</span></div>
+          </div>
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="triggers" data-arch-key="sp_close_expired_auctions">
+            <div class="schema-entity-header"><span>sp_close_expired_auctions</span><span class="badge-square green">PROCEDURE</span></div>
+            <div class="schema-entity-fields">
+              <strong>Target:</strong> Automated 30s Sweep<br/>
+              <strong>Enforcement:</strong> Compares end_time <= NOW(), tests reserve price threshold, designates winner, and creates 48h payment row.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO VIEW PROCEDURE SQL</span><span>↗</span></div>
+          </div>
         </div>`;
     } else if (tabName === 'acid') {
       wrap.innerHTML = `
-        <div style="background:#fff; border:1.5px solid #1a1a1a; border-radius:6px; padding:20px; box-shadow:3px 3px 0 #1a1a1a; font-family:'Space Grotesk', sans-serif; line-height:1.6;">
-          <h4 style="margin-top:0; font-family:'Fkrasterromancompact Smooth', serif; font-size:22px; color:#350AFF;">ACID & Concurrency Architecture</h4>
-          <p>The Auction Society eliminates bidding race conditions through three synchronized database layers:</p>
-          <ul style="padding-left: 20px;">
-            <li><strong>Serializable Transaction Isolation:</strong> All bid insertions run in serializable transaction blocks (<code>SET TRANSACTION ISOLATION LEVEL SERIALIZABLE</code>), preventing phantom reads and non-repeatable reads.</li>
-            <li><strong>Row-Exclusive Locks (<code>SELECT ... FOR UPDATE</code>):</strong> When a concurrent bid begins, the target auction row is locked at the storage engine (InnoDB) level, ensuring simultaneous bids are queued and executed strictly sequentially.</li>
-            <li><strong>Optimistic Concurrency Verification:</strong> The REST API verifies the <code>bidCount</code> counter before committing; if another concurrent bid was recorded in the same millisecond, the slower transaction is rolled back with an optimistic lock error.</li>
-            <li><strong>Zero-Balance Settlement:</strong> Winner evaluation and payments are recorded in idempotent, double-entry audit records.</li>
-          </ul>
+        <div style="margin-bottom:14px; font-size:13px; color:#555;">
+          ✦ <strong>ACID & Multi-Version Concurrency Engine (MVCC)</strong> — Tap any principle to inspect technical implementation and locking mechanics.
+        </div>
+        <div class="schema-entities-grid">
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="acid" data-arch-key="atomicity">
+            <div class="schema-entity-header"><span>A — ATOMICITY</span><span class="badge-square green">ACID</span></div>
+            <div class="schema-entity-fields">
+              <strong>Mechanism:</strong> START TRANSACTION ... COMMIT / ROLLBACK<br/>
+              All-or-nothing bid placement. Any constraint failure triggers complete rollback with zero state corruption.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT MECHANISM</span><span>↗</span></div>
+          </div>
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="acid" data-arch-key="consistency">
+            <div class="schema-entity-header"><span>C — CONSISTENCY</span><span class="badge-square green">ACID</span></div>
+            <div class="schema-entity-fields">
+              <strong>Mechanism:</strong> Foreign Keys & Triggers<br/>
+              Declarative constraints and domain invariants ensure database transitions exclusively between valid states.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT MECHANISM</span><span>↗</span></div>
+          </div>
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="acid" data-arch-key="isolation">
+            <div class="schema-entity-header"><span>I — ISOLATION</span><span class="badge-square green">ACID</span></div>
+            <div class="schema-entity-fields">
+              <strong>Mechanism:</strong> SELECT ... FOR UPDATE (Row Lock)<br/>
+              Exclusive write locks on target auction rows prevent concurrent overwrite anomalies during millisecond bidding collisions.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT MECHANISM</span><span>↗</span></div>
+          </div>
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="acid" data-arch-key="durability">
+            <div class="schema-entity-header"><span>D — DURABILITY</span><span class="badge-square green">ACID</span></div>
+            <div class="schema-entity-fields">
+              <strong>Mechanism:</strong> InnoDB Redo Log (WAL)<br/>
+              Write-ahead logging and Doublewrite Buffer ensure committed transactions permanently survive crashes or power loss.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT MECHANISM</span><span>↗</span></div>
+          </div>
         </div>`;
     } else if (tabName === 'views') {
       wrap.innerHTML = `
-        <div class="code-sql-card">
-<span class="sql-com">-- VIEW: active_auctions_view (Real-time public lot query view)</span>
-<span class="sql-kw">CREATE OR REPLACE VIEW</span> <span class="sql-fn">active_auctions_view</span> <span class="sql-kw">AS</span>
-<span class="sql-kw">SELECT</span> 
-    a.auction_id,
-    i.title,
-    c.name <span class="sql-kw">AS</span> category,
-    i.condition_type,
-    a.current_bid,
-    a.min_increment,
-    a.bid_count,
-    a.end_time,
-    u.name <span class="sql-kw">AS</span> seller_name,
-    i.location,
-    i.image_url
-<span class="sql-kw">FROM</span> AUCTION a
-<span class="sql-kw">JOIN</span> ITEM i <span class="sql-kw">ON</span> a.item_id = i.item_id
-<span class="sql-kw">JOIN</span> CATEGORY c <span class="sql-kw">ON</span> i.category_id = c.category_id
-<span class="sql-kw">JOIN</span> USERS u <span class="sql-kw">ON</span> i.seller_id = u.user_id
-<span class="sql-kw">WHERE</span> a.status = <span class="sql-str">'Active'</span> <span class="sql-kw">AND</span> a.end_time > NOW();
+        <div style="margin-bottom:14px; font-size:13px; color:#555;">
+          ✦ <strong>Analytical & Operational SQL Views</strong> — Tap any view below to inspect complete SQL definitions, joined tables, and query execution samples.
+        </div>
+        <div class="schema-entities-grid" style="grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));">
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="views" data-arch-key="active_auctions_view">
+            <div class="schema-entity-header"><span>active_auctions_view</span><span class="badge-square green">VIEW</span></div>
+            <div class="schema-entity-fields">
+              <strong>Purpose:</strong> Real-time public catalog query view.<br/>
+              Pre-joins AUCTION, ITEM, CATEGORY, and USERS, calculating remaining time and formatting seller information for the catalog grid.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO VIEW FULL SQL & QUERY</span><span>↗</span></div>
+          </div>
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="views" data-arch-key="user_bidding_activity_view">
+            <div class="schema-entity-header"><span>user_bidding_activity_view</span><span class="badge-square green">VIEW</span></div>
+            <div class="schema-entity-fields">
+              <strong>Purpose:</strong> Member bidding analytics ledger.<br/>
+              Aggregates total bids submitted, unique auctions entered, currently winning lots, and total monetary exposure per account.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO VIEW FULL SQL & QUERY</span><span>↗</span></div>
+          </div>
+          <div class="schema-entity-card arch-card-interactive" data-arch-type="views" data-arch-key="category_revenue_summary_view">
+            <div class="schema-entity-header"><span>category_revenue_summary_view</span><span class="badge-square green">VIEW</span></div>
+            <div class="schema-entity-fields">
+              <strong>Purpose:</strong> Curatorial performance view.<br/>
+              Computes departmental inventory volume, active listings count, closed hammer total, and average sale price.
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO VIEW FULL SQL & QUERY</span><span>↗</span></div>
+          </div>
         </div>`;
     }
+
+    // Attach click listeners to all interactive architecture cards
+    wrap.querySelectorAll('[data-arch-type]').forEach(card => {
+      card.addEventListener('click', () => {
+        openArchModal(card.dataset.archType, card.dataset.archKey);
+      });
+    });
   }
 
   // 7. System Log & Live Admin Desk
@@ -1134,6 +1892,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
     document.getElementById('lot-modal-close')?.addEventListener('click', () => closeModal('lot-bid-modal'));
     document.getElementById('account-modal-close')?.addEventListener('click', () => closeModal('account-modal'));
     document.getElementById('dbms-modal-close')?.addEventListener('click', () => closeModal('dbms-arch-modal'));
+    document.getElementById('arch-modal-close')?.addEventListener('click', closeArchModal);
     document.getElementById('system-log-modal-close')?.addEventListener('click', () => closeModal('system-log-modal'));
 
     // 5. Close on Backdrop Click
