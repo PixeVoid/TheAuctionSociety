@@ -6,5 +6,8 @@
   "scripts": {
     "build": "echo 'Static assets ready'",
     "start": "node server.js"
+  },
+  "dependencies": {
+    "mysql2": "^3.24.6"
   }
 }

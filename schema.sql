@@ -166,12 +166,16 @@ CREATE TABLE audit_log (
 -- ============================================================================
 
 -- 2.1 Insert Users (Admin, Buyer, Seller, Both)
--- Passwords are scrypt hashes with 32-char salts
+-- Passwords are scrypt/pbkdf2 hashes with 32-char salts:
+--   admin@theauctionsociety.com: admin12345
+--   buyer@theauctionsociety.com: buyer123
+--   seller@theauctionsociety.com: seller123
+--   member@theauctionsociety.com: member123
 INSERT INTO users (user_id, name, email, password_hash, password_salt, role, status) VALUES
-(1, 'Administrator', 'admin@theauctionsociety.com', 'a3f8c85741b5d1947e2b604b732488a09104f7c8d93021bc78921e54c01ab432df681290bc54a712ef34098231ab45cd8912ef0134bc56780912de34ab7890ef', '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', 'Admin', 'Active'),
-(2, 'Ankit Anand (Buyer)', 'buyer@theauctionsociety.com', 'b4c7d96852c6e2058f3c715c843599b1021508d9ea4132cd89032f65d12bc543ef792301cd65b823fa45109342bc56de9023fa1245cd67891023ef45bc8901fa', '2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e', 'Buyer', 'Active'),
-(3, 'Aryaman Annavajhala (Seller)', 'seller@theauctionsociety.com', 'c5d8ea7963d7f316904d826d954600c2132619e0fb5243de90143076e23cd654fa803412de76c9340b56210453cd67ef01340b2356de78902134fa56cd90120b', '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', 'Seller', 'Active'),
-(4, 'Ankit Anand (Member - Both)', 'member@theauctionsociety.com', 'd6e9fb8074e80427015e937ea65711d3243720f10c6354ef01254187f34de7650b914523ef87da451c67321564de78f012451c3467ef890132450b67de01231c', '4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a', 'Both', 'Active'),
+(1, 'Administrator', 'admin@theauctionsociety.com', 'b6c523875062fc6182bafc7525fd617923084594499c980b37db5da1348490a60c6a5b60c2036cc12bce066af3829384e35ae8251eeafaf8b737e760929e4f6a', '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', 'Admin', 'Active'),
+(2, 'Ankit Anand (Buyer)', 'buyer@theauctionsociety.com', 'c441f3497f29e78fde1400fe5f67e5501c1b7ae6befccbeb9199e14cb55a40bbfe5bbf32f09c8e60320a7edcd0800e5e8a439d6b271d68f878f615c21ffded37', '2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e', 'Buyer', 'Active'),
+(3, 'Aryaman Annavajhala (Seller)', 'seller@theauctionsociety.com', 'bc1573a6ac5216994ad390439906550b690dbb1da2c1afa3c5a02c25514d9b5da095ff3f85370b4f8cbfd40ffec58fd014de49f5172b7905c454ba44c0ab1ac1', '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', 'Seller', 'Active'),
+(4, 'Ankit Anand (Member - Both)', 'member@theauctionsociety.com', '33dec50dc5921b0cf57e47a223edbfd705b46a7b4ec3b705a7cd2e951d7ccc556018b38f86ca9947f36abbf4e41400ddcd0ed01ebb52f5a8a2d44f7766e538f4', '4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a', 'Both', 'Active'),
 (5, 'Sunita Sharma', 'sunita@gmail.com', 'e7f00c9185f91538126fa48fb76822e4354831021d7465f012365298045ef8761ca25634f098eb562d78432675ef890123562d4578f0901243561c78ef12342d', '5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b', 'Buyer', 'Active'),
 (6, 'Vikram Malhotra', 'vikram@gmail.com', 'f8011da2960a26492370b590c87933f5465942132e85760123476309156f09872db3674501a9fc673e89543786f0901234673e568901012354672d89f023453e', '6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c', 'Buyer', 'Active');
 

@@ -2,6 +2,7 @@ const http = require('node:http');
 const fs = require('node:fs');
 const path = require('node:path');
 const crypto = require('node:crypto');
+const db = require('./db');
 
 const ROOT = __dirname;
 const PORT = Number(process.env.PORT || 3000);
@@ -256,10 +257,34 @@ async function api(req, res, url) {
     if (users.some(user => user.email === email)) return sendJson(res, 409, { error: 'An account already exists with that email.' });
     const credentials = await hashPassword(password);
     const user = { id: nextUserId++, name, email, role, status: 'Active', joinedAt: Date.now(), ...credentials };
+    if (db.isConnected) {
+      try {
+        const [resDb] = await db.pool.execute(
+          'INSERT INTO users (name, email, password_hash, password_salt, role, status) VALUES (?, ?, ?, ?, ?, ?)',
+          [name, email, credentials.hash, credentials.salt, role, 'Active']
+        );
+        user.id = resDb.insertId;
+      } catch (dbErr) {
+        if (dbErr.code === 'ER_DUP_ENTRY') {
+          return sendJson(res, 409, { error: 'An account already exists with that email.' });
+        }
+        console.error('[DB] User register error:', dbErr.message);
+      }
+    }
     users.push(user);
     watchlists.set(user.id, new Set());
     createSession(res, user);
     addAudit(user, 'REGISTER', 'users', user.id);
+    if (db.isConnected) {
+      try {
+        await db.pool.execute(
+          'INSERT INTO audit_log (event_type, user_id, summary, ip_address) VALUES (?, ?, ?, ?)',
+          ['REGISTER', user.id, `New account registered: ${user.name} (${user.role})`, req.socket.remoteAddress || '127.0.0.1']
+        );
+      } catch (dbErr) {
+        console.error('[DB] Audit register error:', dbErr.message);
+      }
+    }
     return sendJson(res, 201, { user: safeUser(user) });
   }
 
@@ -275,6 +300,16 @@ async function api(req, res, url) {
     if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return sendJson(res, 401, { error: 'Email or password is incorrect.' });
     createSession(res, user);
     addAudit(user, 'LOGIN', 'users', user.id);
+    if (db.isConnected) {
+      try {
+        await db.pool.execute(
+          'INSERT INTO audit_log (event_type, user_id, summary, ip_address) VALUES (?, ?, ?, ?)',
+          ['LOGIN', user.id, `User logged in: ${user.name} (${user.email})`, req.socket.remoteAddress || '127.0.0.1']
+        );
+      } catch (dbErr) {
+        console.error('[DB] Login audit failed:', dbErr.message);
+      }
+    }
     return sendJson(res, 200, { user: safeUser(user) });
   }
 
@@ -336,8 +371,24 @@ async function api(req, res, url) {
       }
       item.currentBid = Math.round(amount * 100) / 100;
       item.bidCount++;
+      item.winnerId = user.id;
       bids.push({ id: bids.length + 1, auctionId: item.id, userId: user.id, bidderName: user.name, amount: item.currentBid, at: Date.now() });
       addAudit(user, 'PLACE_BID', 'bid', bids.at(-1).id);
+
+      if (db.isConnected) {
+        try {
+          await db.pool.execute(
+            'INSERT INTO bid (auction_id, bidder_id, amount, ip_address) VALUES (?, ?, ?, ?)',
+            [item.id, user.id, item.currentBid, req.socket.remoteAddress || '127.0.0.1']
+          );
+        } catch (dbErr) {
+          if (dbErr.sqlState === '45000') {
+            return sendJson(res, 400, { error: dbErr.message.replace(/^Bidding Error:\s*/i, '') });
+          }
+          console.error('[DB] Bid insert failed:', dbErr.message);
+        }
+      }
+
       return sendJson(res, 201, { message: 'Your bid has been recorded.', auction: publicAuction(item, user) });
     }
 
@@ -346,9 +397,21 @@ async function api(req, res, url) {
       if (!user) return;
       if (!watchlists.has(user.id)) watchlists.set(user.id, new Set());
       const saved = watchlists.get(user.id);
+      const isSaving = !saved.has(item.id);
       if (saved.has(item.id)) saved.delete(item.id); else saved.add(item.id);
-      addAudit(user, saved.has(item.id) ? 'SAVE_AUCTION' : 'UNSAVE_AUCTION', 'watchlist', item.id);
-      return sendJson(res, 200, { watching: saved.has(item.id) });
+      if (db.isConnected) {
+        try {
+          if (isSaving) {
+            await db.pool.execute('INSERT IGNORE INTO watchlist (user_id, auction_id) VALUES (?, ?)', [user.id, item.id]);
+          } else {
+            await db.pool.execute('DELETE FROM watchlist WHERE user_id = ? AND auction_id = ?', [user.id, item.id]);
+          }
+        } catch (dbErr) {
+          console.error('[DB] Watchlist update failed:', dbErr.message);
+        }
+      }
+      addAudit(user, isSaving ? 'SAVE_AUCTION' : 'UNSAVE_AUCTION', 'watchlist', item.id);
+      return sendJson(res, 200, { watching: isSaving });
     }
 
     if (req.method === 'POST' && action === 'payment') {
@@ -398,6 +461,29 @@ async function api(req, res, url) {
     const item = validateListing(body, res);
     if (!item) return;
     const auction = { id: nextAuctionId++, ...item, bidCount: 0, endsAt: item.endsAt, status: 'Active', ownerId: user.id, seller: user.name, winnerId: null };
+
+    if (db.isConnected) {
+      try {
+        const [catRows] = await db.pool.execute('SELECT category_id FROM category WHERE name = ?', [item.category]);
+        const catId = catRows.length > 0 ? catRows[0].category_id : 1;
+        const [itemRes] = await db.pool.execute(
+          'INSERT INTO item (seller_id, category_id, title, condition_type, location, image_url, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
+          [user.id, catId, item.title, item.condition, item.location, item.image, item.description]
+        );
+        const [aucRes] = await db.pool.execute(
+          'INSERT INTO auction (item_id, starting_price, reserve_price, min_increment, current_bid, bid_count, status, start_time, end_time) VALUES (?, ?, ?, ?, ?, 0, ?, NOW(), ?)',
+          [itemRes.insertId, item.startingPrice, item.reservePrice, item.minIncrement, item.startingPrice, 'Active', new Date(item.endsAt)]
+        );
+        auction.id = aucRes.insertId;
+        await db.pool.execute(
+          'INSERT INTO audit_log (event_type, user_id, auction_id, summary, ip_address) VALUES (?, ?, ?, ?, ?)',
+          ['CREATE_LISTING', user.id, auction.id, `Created listing #${auction.id}: ${item.title}`, req.socket.remoteAddress || '127.0.0.1']
+        );
+      } catch (dbErr) {
+        console.error('[DB] Create listing error:', dbErr.message);
+      }
+    }
+
     auctions.unshift(auction);
     addAudit(user, 'CREATE_LISTING', 'auction', auction.id);
     return sendJson(res, 201, publicAuction(auction, user));
@@ -424,6 +510,17 @@ async function api(req, res, url) {
     if (req.method === 'DELETE') {
       if (item.status !== 'Active') return sendJson(res, 409, { error: 'Only active listings can be cancelled.' });
       item.status = 'Cancelled';
+      if (db.isConnected) {
+        try {
+          await db.pool.execute("UPDATE auction SET status = 'Cancelled' WHERE auction_id = ?", [item.id]);
+          await db.pool.execute(
+            'INSERT INTO audit_log (event_type, user_id, auction_id, summary, ip_address) VALUES (?, ?, ?, ?, ?)',
+            ['CANCEL_AUCTION', user.id, item.id, `Cancelled auction #${item.id}`, req.socket.remoteAddress || '127.0.0.1']
+          );
+        } catch (dbErr) {
+          console.error('[DB] Cancel listing error:', dbErr.message);
+        }
+      }
       addAudit(user, 'CANCEL_LISTING', 'auction', item.id);
       return sendJson(res, 200, { message: 'Listing cancelled.' });
     }
@@ -776,6 +873,23 @@ async function bootstrapAccounts() {
       watchlists.set(user.id, new Set());
     }
   }
+
+  if (db.isConnected) {
+    try {
+      const [rows] = await db.pool.execute('SELECT user_id, email, role, name FROM users');
+      let extraId = 1000;
+      for (const u of users) {
+        const dbMatch = rows.find(r => r.email.toLowerCase() === u.email.toLowerCase());
+        if (dbMatch) {
+          u.id = dbMatch.user_id;
+        } else {
+          u.id = extraId++;
+        }
+      }
+    } catch (err) {
+      console.error('[DB] Align user IDs error:', err.message);
+    }
+  }
 }
 
 let bootstrapped = false;
@@ -784,9 +898,11 @@ let bootstrapPromise = null;
 async function ensureBootstrapped() {
   if (bootstrapped) return;
   if (!bootstrapPromise) {
-    bootstrapPromise = bootstrapAccounts().then(() => {
+    bootstrapPromise = (async () => {
+      await db.checkConnection();
+      await bootstrapAccounts();
       bootstrapped = true;
-    }).catch(err => {
+    })().catch(err => {
       bootstrapPromise = null;
       throw err;
     });
