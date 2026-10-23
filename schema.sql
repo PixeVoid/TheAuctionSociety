@@ -195,12 +195,12 @@ INSERT INTO item (item_id, seller_id, category_id, title, condition_type, locati
 
 -- 2.4 Insert Auctions
 INSERT INTO auction (auction_id, item_id, starting_price, reserve_price, min_increment, current_bid, bid_count, winner_id, status, start_time, end_time) VALUES
-(1, 1, 65000.00, 85000.00, 1000.00, 72000.00, 3, NULL, 'Active', NOW() - INTERVAL 2 DAY, NOW() + INTERVAL 2 DAY),
-(2, 2, 15000.00, 20000.00, 500.00, 18500.00, 3, NULL, 'Active', NOW() - INTERVAL 1 DAY, NOW() + INTERVAL 3 DAY),
-(3, 3, 150000.00, 185000.00, 2000.00, 168000.00, 3, NULL, 'Active', NOW() - INTERVAL 1 DAY, NOW() + INTERVAL 4 DAY),
-(4, 4, 4500.00, 5000.00, 100.00, 6200.00, 2, NULL, 'Active', NOW() - INTERVAL 1 DAY, NOW() + INTERVAL 5 DAY),
-(5, 5, 3000.00, 3500.00, 100.00, 9400.00, 2, NULL, 'Active', NOW() - INTERVAL 2 DAY, NOW() + INTERVAL 6 DAY),
-(6, 6, 600.00, 800.00, 50.00, 850.00, 2, NULL, 'Active', NOW() - INTERVAL 3 DAY, NOW() + INTERVAL 7 DAY);
+(1, 1, 65000.00, 85000.00, 1000.00, 72000.00, 3, 2, 'Active', NOW() - INTERVAL 2 DAY, NOW() + INTERVAL 2 DAY),
+(2, 2, 15000.00, 20000.00, 500.00, 18500.00, 3, 2, 'Active', NOW() - INTERVAL 1 DAY, NOW() + INTERVAL 3 DAY),
+(3, 3, 150000.00, 185000.00, 2000.00, 168000.00, 3, 5, 'Active', NOW() - INTERVAL 1 DAY, NOW() + INTERVAL 4 DAY),
+(4, 4, 4500.00, 5000.00, 100.00, 6200.00, 2, 6, 'Active', NOW() - INTERVAL 1 DAY, NOW() + INTERVAL 5 DAY),
+(5, 5, 3000.00, 3500.00, 100.00, 9400.00, 2, 2, 'Active', NOW() - INTERVAL 2 DAY, NOW() + INTERVAL 6 DAY),
+(6, 6, 600.00, 800.00, 50.00, 850.00, 2, 2, 'Active', NOW() - INTERVAL 3 DAY, NOW() + INTERVAL 7 DAY);
 
 -- 2.5 Insert Sample Bids
 INSERT INTO bid (bid_id, auction_id, bidder_id, amount, bid_time, is_winning, ip_address) VALUES
@@ -286,21 +286,16 @@ END$$
 
 -- TRIGGER 2: trg_bid_audit (AFTER INSERT ON bid)
 -- Synchronizes database state using Exp-2 DML commands:
--- 1. Updates previous winning bids to 0 (outbid).
--- 2. Updates auction current high bid and increments bid counter.
--- 3. Inserts an immutable audit record into audit_log.
+-- 1. Atomically updates auction current high bid, winner_id, and increments bid counter.
+-- 2. Inserts an immutable audit record into audit_log.
 CREATE TRIGGER trg_bid_audit
 AFTER INSERT ON bid
 FOR EACH ROW
 BEGIN
-    -- Exp-2 DML: Flag previous winning bids for this auction as 0 (outbid)
-    UPDATE bid
-    SET is_winning = 0
-    WHERE auction_id = NEW.auction_id AND bid_id != NEW.bid_id;
-
-    -- Exp-2 DML: Atomically update auction high bid and increment bid counter
+    -- Exp-2 DML: Atomically update auction high bid, designate winner, and increment bid counter
     UPDATE auction
     SET current_bid = NEW.amount,
+        winner_id = NEW.bidder_id,
         bid_count = bid_count + 1
     WHERE auction_id = NEW.auction_id;
 
@@ -359,10 +354,11 @@ SELECT
     COUNT(b.bid_id) AS total_bids_submitted,
     COUNT(DISTINCT b.auction_id) AS auctions_participated,
     COALESCE(MAX(b.amount), 0.00) AS highest_bid_placed,
-    SUM(CASE WHEN b.is_winning = 1 THEN 1 ELSE 0 END) AS active_winning_lots,
-    COALESCE(SUM(CASE WHEN b.is_winning = 1 THEN b.amount ELSE 0 END), 0.00) AS total_winning_exposure
+    COUNT(DISTINCT CASE WHEN a.winner_id = u.user_id AND a.status = 'Active' THEN a.auction_id END) AS active_winning_lots,
+    COALESCE(SUM(DISTINCT CASE WHEN a.winner_id = u.user_id AND a.status = 'Active' THEN a.current_bid END), 0.00) AS total_winning_exposure
 FROM users u
 LEFT JOIN bid b ON u.user_id = b.bidder_id
+LEFT JOIN auction a ON u.user_id = a.winner_id
 GROUP BY u.user_id, u.name, u.email, u.role, u.status;
 
 -- VIEW 3: category_performance_view
