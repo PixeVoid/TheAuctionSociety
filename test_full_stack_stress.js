@@ -194,7 +194,7 @@ async function runFullStackStressTest() {
     minIncrement: 1000,
     durationDays: 7,
     location: 'Mumbai, Maharashtra',
-    image: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=85',
+    image: 'assets/placeholder.svg',
     description: 'Rare 18th century brass navigational astrolabe with engraved celestial coordinates.'
   }, { Cookie: sellerCookie });
   assert(createListRes.status === 201, 'Seller successfully created new consignment lot (HTTP 201)');
@@ -252,18 +252,26 @@ async function runFullStackStressTest() {
   }
 }
 
-// Start local server if not running, then execute
-const server = require('./server');
 const PORT = 3000;
 
-server.listen(PORT, '127.0.0.1', async () => {
+http.get('http://127.0.0.1:3000/api/categories', async (res) => {
   try {
     await runFullStackStressTest();
   } catch (err) {
     console.error('Fatal stress test failure:', err);
     process.exit(1);
-  } finally {
-    server.close();
-    process.exit(0);
   }
+}).on('error', () => {
+  const server = require('./server');
+  server.listen(PORT, '127.0.0.1', async () => {
+    try {
+      await runFullStackStressTest();
+    } catch (err) {
+      console.error('Fatal stress test failure:', err);
+      process.exit(1);
+    } finally {
+      server.close();
+      process.exit(0);
+    }
+  });
 });

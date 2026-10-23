@@ -141,7 +141,7 @@
               </div>
               <div style="display: flex; justify-content: space-between; align-items: center; background: rgba(255,255,255,0.04); padding: 5px 10px; border-radius: 4px; border: 1px solid rgba(255,255,255,0.06);">
                 <span style="color: #facc15; font-weight: 700; min-width: 52px;">Both:</span>
-                <span style="color: #ffffff; flex: 1; padding: 0 8px; word-break: break-all;">member@theauctionsociety.com</span>
+                <span style="color: #ffffff; flex: 1; padding: 0 8px; word-break: break-all;">member@theauctionsociety.com (Sachin)</span>
                 <code style="color: #38bdf8; background: rgba(56, 189, 248, 0.15); padding: 2px 7px; border-radius: 3px; font-weight: 600;">both12345</code>
               </div>
             </div>
@@ -150,7 +150,7 @@
               <button type="button" style="flex:1; min-width:85px; padding: 8px 10px; font-size: 11px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; background: #1a1a24; color: #ffffff; border: 1.5px solid #333344; border-radius: 4px; cursor: pointer; transition: all 0.15s ease;" onmouseover="this.style.background='#BCF015';this.style.color='#0B0E01';this.style.borderColor='#BCF015';" onmouseout="this.style.background='#1a1a24';this.style.color='#ffffff';this.style.borderColor='#333344';" onclick="document.getElementById('login-email').value='admin@theauctionsociety.com';document.getElementById('login-password').value='admin12345';">Admin</button>
               <button type="button" style="flex:1; min-width:85px; padding: 8px 10px; font-size: 11px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; background: #1a1a24; color: #ffffff; border: 1.5px solid #333344; border-radius: 4px; cursor: pointer; transition: all 0.15s ease;" onmouseover="this.style.background='#38bdf8';this.style.color='#0B0E01';this.style.borderColor='#38bdf8';" onmouseout="this.style.background='#1a1a24';this.style.color='#ffffff';this.style.borderColor='#333344';" onclick="document.getElementById('login-email').value='buyer@theauctionsociety.com';document.getElementById('login-password').value='buyer12345';">Buyer</button>
               <button type="button" style="flex:1; min-width:85px; padding: 8px 10px; font-size: 11px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; background: #1a1a24; color: #ffffff; border: 1.5px solid #333344; border-radius: 4px; cursor: pointer; transition: all 0.15s ease;" onmouseover="this.style.background='#f472b6';this.style.color='#0B0E01';this.style.borderColor='#f472b6';" onmouseout="this.style.background='#1a1a24';this.style.color='#ffffff';this.style.borderColor='#333344';" onclick="document.getElementById('login-email').value='seller@theauctionsociety.com';document.getElementById('login-password').value='seller12345';">Seller</button>
-              <button type="button" style="flex:1; min-width:85px; padding: 8px 10px; font-size: 11px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; background: #1a1a24; color: #ffffff; border: 1.5px solid #333344; border-radius: 4px; cursor: pointer; transition: all 0.15s ease;" onmouseover="this.style.background='#facc15';this.style.color='#0B0E01';this.style.borderColor='#facc15';" onmouseout="this.style.background='#1a1a24';this.style.color='#ffffff';this.style.borderColor='#333344';" onclick="document.getElementById('login-email').value='member@theauctionsociety.com';document.getElementById('login-password').value='both12345';">Both</button>
+              <button type="button" style="flex:1; min-width:85px; padding: 8px 10px; font-size: 11px; font-weight: 700; font-family: 'Space Grotesk', sans-serif; background: #1a1a24; color: #ffffff; border: 1.5px solid #333344; border-radius: 4px; cursor: pointer; transition: all 0.15s ease;" onmouseover="this.style.background='#facc15';this.style.color='#0B0E01';this.style.borderColor='#facc15';" onmouseout="this.style.background='#1a1a24';this.style.color='#ffffff';this.style.borderColor='#333344';" onclick="document.getElementById('login-email').value='member@theauctionsociety.com';document.getElementById('login-password').value='both12345';">Both (Sachin)</button>
             </div>
           </div>
         </form>
@@ -258,6 +258,75 @@
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/SplitText.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/CustomEase.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/gsap@3.13.0/dist/ScrambleTextPlugin.min.js"></script>
+<!-- ========================================================
+     MODAL: LOT DETAILS & LIVE BIDDING DRAWER
+     ======================================================== -->
+<div id="lot-bid-modal" class="crt-modal-backdrop" role="dialog" aria-modal="true" aria-hidden="true">
+  <div class="crt-modal-window lot-modal-window">
+    <div class="crt-window-titlebar">
+      <div class="crt-titlebar-left">
+        <img src="assets/06.png" alt="" class="crt-titlebar-star" />
+        <span class="crt-titlebar-title" id="lot-modal-header-title">Lot Details</span>
+      </div>
+      <button class="crt-window-close" id="lot-modal-close" aria-label="Close lot details">✕</button>
+    </div>
+    <div class="lot-modal-body">
+      <div class="lot-modal-left">
+        <div class="lot-modal-img-wrap">
+          <img id="lot-modal-img" src="" alt="Lot Image" class="lot-modal-img" />
+          <div class="lot-modal-badges">
+            <span id="lot-modal-badge-lot" class="badge-square green">LOT #000</span>
+            <span id="lot-modal-badge-cat" class="badge-round green">Category</span>
+            <span id="lot-modal-badge-cond" class="badge-square green">Condition</span>
+          </div>
+        </div>
+        <div class="lot-modal-meta">
+          <div class="lot-meta-row"><strong>Seller:</strong> <span id="lot-modal-seller">--</span></div>
+          <div class="lot-meta-row"><strong>Location:</strong> <span id="lot-modal-location">--</span></div>
+          <div class="lot-meta-row"><strong>Reserve:</strong> <span id="lot-modal-reserve-status" class="reserve-status-tag">Evaluating...</span></div>
+        </div>
+        <p id="lot-modal-desc" class="lot-modal-description">--</p>
+      </div>
+      <div class="lot-modal-right">
+        <div class="bid-status-card">
+          <div class="bid-status-label">CURRENT HIGH BID</div>
+          <div class="bid-status-amount" id="lot-modal-current-bid">₹0</div>
+          <div class="bid-status-sub"><span id="lot-modal-bid-sub">0 bids · Min Increment: ₹100</span> · Ends in <span id="lot-modal-timer">--</span></div>
+        </div>
+
+        <form id="lot-bid-form" class="lot-bid-form">
+          <label for="bid-amount-input" class="bid-input-label">
+            YOUR BID AMOUNT (INR ₹)
+            <span class="bid-min-hint" id="lot-bid-min-hint">Min: ₹0</span>
+          </label>
+          <div class="bid-input-wrap">
+            <span class="bid-currency-symbol">₹</span>
+            <input type="number" id="bid-amount-input" class="bid-amount-input" placeholder="Enter bid..." required min="1" step="1" />
+          </div>
+          <div class="quick-increment-btns" id="quick-bid-pills">
+            <button type="button" class="quick-bid-btn" data-inc="500">+₹500</button>
+            <button type="button" class="quick-bid-btn" data-inc="1000">+₹1,000</button>
+            <button type="button" class="quick-bid-btn" data-inc="5000">+₹5,000</button>
+            <button type="button" class="quick-bid-btn" data-inc="25000">+₹25,000</button>
+          </div>
+          <div class="bid-form-feedback" id="bid-form-feedback"></div>
+          <div class="bid-form-actions">
+            <button type="submit" class="btn-bid-submit" id="btn-submit-bid">Place Bid (SQL Transaction)</button>
+            <button type="button" class="btn-watchlist-toggle" id="lot-modal-watchlist-btn">♥ Save</button>
+          </div>
+        </form>
+
+        <div class="bid-history-wrap">
+          <div class="bid-history-title">RECENT TRANSACTION LOG</div>
+          <div class="recent-bids-list" id="lot-modal-bids-list">
+            <!-- Live bid rows -->
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
 <script src="script.js"></script>
 
 <div id="toast-container" class="toast-container" aria-live="polite"></div>

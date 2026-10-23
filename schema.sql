@@ -175,7 +175,7 @@ INSERT INTO users (user_id, name, email, password_hash, password_salt, role, sta
 (1, 'Administrator', 'admin@theauctionsociety.com', 'b6c523875062fc6182bafc7525fd617923084594499c980b37db5da1348490a60c6a5b60c2036cc12bce066af3829384e35ae8251eeafaf8b737e760929e4f6a', '1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d', 'Admin', 'Active'),
 (2, 'Ankit Anand (Buyer)', 'buyer@theauctionsociety.com', 'c441f3497f29e78fde1400fe5f67e5501c1b7ae6befccbeb9199e14cb55a40bbfe5bbf32f09c8e60320a7edcd0800e5e8a439d6b271d68f878f615c21ffded37', '2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e', 'Buyer', 'Active'),
 (3, 'Aryaman Annavajhala (Seller)', 'seller@theauctionsociety.com', 'bc1573a6ac5216994ad390439906550b690dbb1da2c1afa3c5a02c25514d9b5da095ff3f85370b4f8cbfd40ffec58fd014de49f5172b7905c454ba44c0ab1ac1', '3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f', 'Seller', 'Active'),
-(4, 'Ankit Anand (Member - Both)', 'member@theauctionsociety.com', '33dec50dc5921b0cf57e47a223edbfd705b46a7b4ec3b705a7cd2e951d7ccc556018b38f86ca9947f36abbf4e41400ddcd0ed01ebb52f5a8a2d44f7766e538f4', '4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a', 'Both', 'Active'),
+(4, 'Sachin (Member - Both)', 'member@theauctionsociety.com', '33dec50dc5921b0cf57e47a223edbfd705b46a7b4ec3b705a7cd2e951d7ccc556018b38f86ca9947f36abbf4e41400ddcd0ed01ebb52f5a8a2d44f7766e538f4', '4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a', 'Both', 'Active'),
 (5, 'Sunita Sharma', 'sunita@gmail.com', 'e7f00c9185f91538126fa48fb76822e4354831021d7465f012365298045ef8761ca25634f098eb562d78432675ef890123562d4578f0901243561c78ef12342d', '5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b', 'Buyer', 'Active'),
 (6, 'Vikram Malhotra', 'vikram@gmail.com', 'f8011da2960a26492370b590c87933f5465942132e85760123476309156f09872db3674501a9fc673e89543786f0901234673e568901012354672d89f023453e', '6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c', 'Buyer', 'Active');
 
@@ -237,6 +237,20 @@ INSERT INTO audit_log (event_type, user_id, auction_id, summary, ip_address) VAL
 ('CREATE_LISTING', 3, 2, 'Seller created listing #2: Dutch Masters Floral Still Life (c. 1675)', '127.0.0.1'),
 ('PLACE_BID', 2, 1, 'Bid placed: Rs. 72,000.00 on auction lot #1', '127.0.0.1'),
 ('PLACE_BID', 2, 2, 'Bid placed: Rs. 18,500.00 on auction lot #2', '127.0.0.1');
+
+-- 2.8 EXPERIMENT-2: TRANSACTION CONTROL LANGUAGE (TCL: COMMIT, ROLLBACK, SAVEPOINT)
+-- Demonstrates atomic transaction boundaries, savepoints, partial rollback, and final commit:
+START TRANSACTION;
+-- TCL Step 1: Insert an offer
+INSERT INTO bid (auction_id, bidder_id, amount, ip_address) VALUES (1, 6, 73000.00, '127.0.0.1');
+-- TCL Step 2: Establish a safe transaction checkpoint
+SAVEPOINT sp_bid_checkpoint;
+-- TCL Step 3: Simulate an accidental erroneous price update
+UPDATE auction SET starting_price = 1.00 WHERE auction_id = 1;
+-- TCL Step 4: Undo accidental modification using SAVEPOINT
+ROLLBACK TO SAVEPOINT sp_bid_checkpoint;
+-- TCL Step 5: Permanently commit the valid state
+COMMIT;
 
 -- ============================================================================
 -- 3. EXPERIMENT-5: DATABASE TRIGGERS

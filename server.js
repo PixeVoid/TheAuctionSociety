@@ -417,12 +417,34 @@ async function api(req, res, url) {
     if (req.method === 'POST' && action === 'payment') {
       const user = authorize(req, res);
       if (!user) return;
-      if (!item.payment || item.winnerId !== user.id) return sendJson(res, 404, { error: 'No payment is due for this account.' });
-      if (!['Pending', 'Overdue'].includes(item.payment.status)) return sendJson(res, 409, { error: 'This payment has already been updated.' });
+      if (item.winnerId !== user.id) return sendJson(res, 404, { error: 'No payment is due for this account.' });
+      if (!item.payment) {
+        item.payment = { amount: item.currentBid, dueBy: Date.now() + 48 * 3600 * 1000, status: 'Pending' };
+      }
+      if (item.payment.status === 'Paid') return sendJson(res, 409, { error: 'This payment has already been settled.' });
       item.payment.status = 'Paid';
       item.payment.paidAt = Date.now();
+      item.payment.transactionRef = 'TXN_' + Date.now();
+
+      if (db.isConnected) {
+        try {
+          await db.pool.execute(
+            `INSERT INTO payment (auction_id, payer_id, amount, payment_status, deadline_at, transaction_ref, paid_at)
+             VALUES (?, ?, ?, 'Paid', NOW() + INTERVAL 2 DAY, ?, NOW())
+             ON DUPLICATE KEY UPDATE payment_status = 'Paid', transaction_ref = VALUES(transaction_ref), paid_at = NOW()`,
+            [item.id, user.id, item.currentBid, item.payment.transactionRef]
+          );
+          await db.pool.execute(
+            'INSERT INTO audit_log (event_type, user_id, auction_id, summary, ip_address) VALUES (?, ?, ?, ?, ?)',
+            ['SETTLE_PAYMENT', user.id, item.id, `Settled payment of Rs. ${item.currentBid} for auction #${item.id}`, req.socket.remoteAddress || '127.0.0.1']
+          );
+        } catch (dbErr) {
+          console.error('[DB] Payment settlement failed in MySQL:', dbErr.message);
+        }
+      }
+
       addAudit(user, 'MARK_PAYMENT_PAID', 'payment', item.id);
-      return sendJson(res, 200, { message: 'Demo payment marked as paid.' });
+      return sendJson(res, 200, { message: 'Demo payment settled in SQL ledger! Status updated to Paid.', paymentStatus: 'Paid' });
     }
   }
 
@@ -496,8 +518,8 @@ async function api(req, res, url) {
     const user = authorize(req, res, ['Seller', 'Both']);
     if (!user) return;
     if (item.ownerId !== user.id) return sendJson(res, 403, { error: 'You can only change your own listing.' });
-    if (item.bidCount > 0) return sendJson(res, 409, { error: 'A listing cannot be edited or cancelled after it receives a bid.' });
     if (req.method === 'PATCH') {
+      if (item.bidCount > 0) return sendJson(res, 409, { error: 'A listing cannot be edited after it receives a bid.' });
       if (item.status !== 'Active') return sendJson(res, 409, { error: 'Only active listings can be edited.' });
       const body = await parseBody(req, res);
       if (!body) return;
@@ -635,10 +657,10 @@ function validateListing(body, res) {
     return null;
   }
   const now = Date.now();
-  const minDuration = 60 * 60 * 1000; // at least 1 hour
+  const minDuration = 60 * 1000; // at least 1 minute (allows 2-min & 5-min quick demo auctions)
   const maxDuration = 30 * 24 * 60 * 60 * 1000; // at most 30 days
   if (!Number.isFinite(endsAt) || endsAt < now + minDuration || endsAt > now + maxDuration) {
-    sendJson(res, 400, { error: 'Auction end time must be between 1 hour and 30 days from now.' });
+    sendJson(res, 400, { error: 'Auction end time must be between 1 minute and 30 days from now.' });
     return null;
   }
   const image = String(body.image || '').trim();
@@ -832,7 +854,7 @@ async function bootstrapAccounts() {
     },
     // 4. Pre-configured Demo Member (Both Buyer & Seller privileges)
     {
-      name: 'Ankit Anand (Member - Both)',
+      name: 'Sachin (Member - Both)',
       email: 'member@theauctionsociety.com',
       pass: 'both12345',
       role: 'Both'
@@ -886,8 +908,53 @@ async function bootstrapAccounts() {
           u.id = extraId++;
         }
       }
+
+      // Synchronize full auction catalog from MySQL
+      const [aucRows] = await db.pool.execute(`
+        SELECT 
+          a.auction_id as id, 
+          i.title, 
+          c.name as category, 
+          i.condition_type as \`condition\`, 
+          a.current_bid as currentBid, 
+          a.starting_price as startingPrice, 
+          a.reserve_price as reservePrice, 
+          a.min_increment as minIncrement, 
+          a.bid_count as bidCount, 
+          UNIX_TIMESTAMP(a.end_time)*1000 as endsAt, 
+          a.status, 
+          u.name as seller, 
+          i.seller_id as ownerId, 
+          a.winner_id as winnerId, 
+          i.location, 
+          i.image_url as image, 
+          i.description 
+        FROM auction a 
+        JOIN item i ON a.item_id = i.item_id 
+        JOIN category c ON i.category_id = c.category_id 
+        JOIN users u ON i.seller_id = u.user_id
+      `);
+      if (aucRows.length > 0) {
+        for (const row of aucRows) {
+          const formatted = {
+            ...row,
+            currentBid: Number(row.currentBid),
+            startingPrice: Number(row.startingPrice),
+            reservePrice: Number(row.reservePrice),
+            minIncrement: Number(row.minIncrement),
+            bidCount: Number(row.bidCount),
+            endsAt: Number(row.endsAt)
+          };
+          const existingIdx = auctions.findIndex(a => a.id === formatted.id);
+          if (existingIdx >= 0) {
+            auctions[existingIdx] = { ...auctions[existingIdx], ...formatted };
+          } else {
+            auctions.push(formatted);
+          }
+        }
+      }
     } catch (err) {
-      console.error('[DB] Align user IDs error:', err.message);
+      console.error('[DB] Align database error:', err.message);
     }
   }
 }

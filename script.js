@@ -308,18 +308,20 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
       const lot = await res.json();
       state.activeLot = lot;
 
-      document.getElementById('lot-modal-header-title').textContent = `${lot.title} (LOT #${lot.id})`;
+      const setEl = (id, val) => { const el = document.getElementById(id); if (el) el.textContent = val; };
+
+      setEl('lot-modal-header-title', `${lot.title} (LOT #${lot.id})`);
       const modalImg = document.getElementById('lot-modal-img');
       if (modalImg) {
         modalImg.onerror = () => { modalImg.src = 'assets/placeholder.svg'; };
         modalImg.src = lot.image || 'assets/placeholder.svg';
         modalImg.alt = lot.title || 'Auction lot';
       }
-      document.getElementById('lot-modal-badge-lot').textContent = `LOT #${lot.id.toString().padStart(3, '0')}`;
-      document.getElementById('lot-modal-badge-cat').textContent = lot.category;
-      document.getElementById('lot-modal-badge-cond').textContent = lot.condition;
-      document.getElementById('lot-modal-seller').textContent = lot.seller || 'Verified Member';
-      document.getElementById('lot-modal-location').textContent = lot.location || 'Mumbai, Maharashtra';
+      setEl('lot-modal-badge-lot', `LOT #${lot.id.toString().padStart(3, '0')}`);
+      setEl('lot-modal-badge-cat', lot.category || 'General');
+      setEl('lot-modal-badge-cond', lot.condition || 'Standard');
+      setEl('lot-modal-seller', lot.seller || 'Verified Member');
+      setEl('lot-modal-location', lot.location || 'Mumbai, Maharashtra');
 
       const reserveEl = document.getElementById('lot-modal-reserve-status');
       if (reserveEl) {
@@ -336,8 +338,8 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
         }
       }
 
-      document.getElementById('lot-modal-desc').textContent = lot.description;
-      document.getElementById('lot-modal-current-bid').textContent = formatINR(lot.currentBid);
+      setEl('lot-modal-desc', lot.description || '');
+      setEl('lot-modal-current-bid', formatINR(lot.currentBid));
 
       const isClosed = lot.status === 'Closed' || Date.now() >= lot.endsAt;
       const timeLeft = isClosed ? 'Closed' : formatCountdown(lot.endsAt - Date.now());
@@ -704,9 +706,12 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
                   <td>${l.bidCount}</td>
                   <td><span class="badge-round green">${escapeHtml(l.status)}</span></td>
                   <td>
-                    ${l.bidCount === 0
-                      ? `<button type="button" class="btn-dash-action" style="background:#ff3366; color:#fff;" onclick="window.__auctionApp.cancelListing(${l.id})">Cancel</button>`
-                      : '<span style="font-size:12px; color:#777;">Active Bids</span>'}
+                    <div style="display:flex; gap:6px; flex-wrap:wrap; align-items:center;">
+                      <button type="button" class="btn-dash-action" onclick="window.__auctionApp.openLotModal(${l.id})">View Lot</button>
+                      ${l.status === 'Active'
+                        ? `<button type="button" class="btn-dash-action" style="background:#ff3366; color:#fff;" onclick="window.__auctionApp.cancelListing(${l.id})">Cancel</button>`
+                        : '<span style="font-size:12px; color:#777;">Cancelled</span>'}
+                    </div>
                   </td>
                 </tr>`).join('')}
             </tbody>
@@ -761,6 +766,9 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
             <div class="form-group">
               <label>Auction Duration</label>
               <select id="listing-duration" class="catalog-sort-select">
+                <option value="sec_120">⚡ 2 Minutes (Demo / Viva Test)</option>
+                <option value="sec_300">⚡ 5 Minutes (Quick Test)</option>
+                <option value="sec_600">10 Minutes</option>
                 <option value="1">1 Day (Quick Auction)</option>
                 <option value="3">3 Days</option>
                 <option value="7" selected>7 Days (Standard)</option>
@@ -770,8 +778,8 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
             </div>
           </div>
           <div class="form-group">
-            <label>Image URL</label>
-            <input type="url" id="listing-image" class="auth-input" required value="https://images.unsplash.com/photo-1516035069371-29a1b244cc32?auto=format&fit=crop&w=1200&q=85" />
+            <label>Image URL <span style="font-size:11px; color:#888; font-weight:normal;">(Optional - leave blank for 'IMAGE NOT PRESENT' placard)</span></label>
+            <input type="url" id="listing-image" class="auth-input" placeholder="https://... (Optional)" />
           </div>
           <div class="form-group">
             <label>Description</label>
@@ -786,7 +794,14 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
 
   async function handleCreateListing(e) {
     e.preventDefault();
-    const durationDays = Number(document.getElementById('listing-duration')?.value || 7);
+    const durVal = String(document.getElementById('listing-duration')?.value || '7');
+    let durationMillis = 7 * 86400000;
+    if (durVal.startsWith('sec_')) {
+      durationMillis = Number(durVal.replace('sec_', '')) * 1000;
+    } else {
+      durationMillis = Number(durVal) * 86400000;
+    }
+    const imgVal = (document.getElementById('listing-image')?.value || '').trim();
     const payload = {
       title: document.getElementById('listing-title').value.trim(),
       category: document.getElementById('listing-category').value,
@@ -794,9 +809,9 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
       startingPrice: Number(document.getElementById('listing-start-price').value),
       minIncrement: Number(document.getElementById('listing-increment').value),
       reservePrice: Number(document.getElementById('listing-reserve').value),
-      endDate: new Date(Date.now() + durationDays * 86400000).toISOString(),
+      endDate: new Date(Date.now() + durationMillis).toISOString(),
       location: document.getElementById('listing-location').value.trim(),
-      image: document.getElementById('listing-image').value.trim(),
+      image: imgVal,
       description: document.getElementById('listing-description').value.trim()
     };
 
@@ -890,7 +905,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
             ['1', 'Administrator', 'admin@theauctionsociety.com', 'Admin', 'Active', '2026-10-20 05:30:00'],
             ['2', 'Ankit Anand (Buyer)', 'buyer@theauctionsociety.com', 'Buyer', 'Active', '2026-10-20 05:30:00'],
             ['3', 'Aryaman Annavajhala (Seller)', 'seller@theauctionsociety.com', 'Seller', 'Active', '2026-10-20 05:30:00'],
-            ['7', 'Ankit Anand (Member - Both)', 'member@theauctionsociety.com', 'Both', 'Active', '2026-10-20 05:30:00']
+            ['4', 'Sachin (Member - Both)', 'member@theauctionsociety.com', 'Both', 'Active', '2026-10-20 05:30:00']
           ]
         }
       },
