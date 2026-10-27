@@ -867,26 +867,31 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
       users: {
         title: 'TABLE 1: USERS (Account & Identity Ledger - Exp-1 DDL)',
         badge: '3NF Verified',
-        summary: 'Central identity, authentication, and role-based access control (RBAC) ledger. Stores credentials and account status with strict integrity constraints.',
-        proof: 'Satisfies 1NF (all column values are atomic; no multivalued attributes), 2NF (table has a single-attribute primary key user_id, eliminating partial dependencies), and 3NF (all non-key attributes depend solely and directly on user_id with zero transitive dependencies).',
+        summary: 'Central identity, authentication, and role-based access control (RBAC) ledger. Stores credentials and account status with composite attribute name (first_name, last_name).',
+        proof: 'Satisfies 1NF (atomic values, composite name mapped into first_name and last_name), 2NF (single-attribute primary key user_id), and 3NF (zero transitive dependencies).',
         columns: [
           { name: 'user_id', type: 'INT', constraints: 'PRIMARY KEY, AUTO_INCREMENT', desc: 'Surrogate primary key identifying the user or administrator.' },
-          { name: 'name', type: 'VARCHAR(100)', constraints: 'NOT NULL', desc: 'Full name or pseudonym of the account holder.' },
+          { name: 'first_name', type: 'VARCHAR(50)', constraints: 'NOT NULL', desc: 'Given name component of composite attribute.' },
+          { name: 'last_name', type: 'VARCHAR(50)', constraints: 'NOT NULL', desc: 'Family name component of composite attribute.' },
+          { name: 'name', type: 'VARCHAR(100)', constraints: 'NOT NULL', desc: 'Full display name of the account holder.' },
           { name: 'email', type: 'VARCHAR(255)', constraints: 'UNIQUE, NOT NULL', desc: 'Unique login address and notification target.' },
           { name: 'password_hash', type: 'CHAR(128)', constraints: 'NOT NULL', desc: 'Cryptographic hash of the user password.' },
           { name: 'password_salt', type: 'CHAR(32)', constraints: 'NOT NULL', desc: 'Cryptographic salt string.' },
           { name: 'role', type: 'VARCHAR(20)', constraints: "NOT NULL, DEFAULT 'Buyer', CHECK (role IN ('Buyer', 'Seller', 'Both', 'Admin'))", desc: 'Domain constraint restricting access control roles.' },
-          { name: 'status', type: 'VARCHAR(20)', constraints: "NOT NULL, DEFAULT 'Active', CHECK (status IN ('Active', 'Blocked'))", desc: 'Account status domain constraint (Blocked prevents bidding).' },
-          { name: 'created_at', type: 'TIMESTAMP', constraints: 'DEFAULT CURRENT_TIMESTAMP', desc: 'Timestamp of account registration.' }
+          { name: 'status', type: 'VARCHAR(20)', constraints: "NOT NULL, DEFAULT 'Active', CHECK (status IN ('Active', 'Blocked'))", desc: 'Account status domain constraint.' },
+          { name: 'registered_at', type: 'TIMESTAMP', constraints: 'DEFAULT CURRENT_TIMESTAMP', desc: 'Timestamp of account registration.' }
         ],
         ddl: `CREATE TABLE users (
     user_id INT AUTO_INCREMENT,
-    name VARCHAR(100) NOT NULL,
+    first_name VARCHAR(50) NOT NULL DEFAULT '',
+    last_name VARCHAR(50) NOT NULL DEFAULT '',
+    name VARCHAR(100) NOT NULL DEFAULT '',
     email VARCHAR(255) NOT NULL,
     password_hash CHAR(128) NOT NULL,
     password_salt CHAR(32) NOT NULL,
     role VARCHAR(20) NOT NULL DEFAULT 'Buyer',
     status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_users PRIMARY KEY (user_id),
     CONSTRAINT uq_users_email UNIQUE (email),
@@ -894,18 +899,48 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
     CONSTRAINT chk_users_status CHECK (status IN ('Active', 'Blocked'))
 );`,
         relations: [
+          '1 : N with USER_PHONE — Identifying relationship "has" with weak entity user_phone.',
           '1 : N with ITEM — One seller consigns multiple catalog items (ITEM.seller_id → USERS.user_id).',
           '1 : N with BID — One buyer places multiple atomic bids (BID.bidder_id → USERS.user_id).',
           '1 : N with PAYMENT — Winning buyers remit payment obligations (PAYMENT.payer_id → USERS.user_id).',
           'M : N with AUCTION — Resolved via WATCHLIST(user_id, auction_id) junction table.'
         ],
         sample: {
-          headers: ['user_id', 'name', 'email', 'role', 'status', 'created_at'],
+          headers: ['user_id', 'first_name', 'last_name', 'email', 'role', 'status'],
           rows: [
-            ['1', 'Administrator', 'admin@theauctionsociety.com', 'Admin', 'Active', '2026-10-20 05:30:00'],
-            ['2', 'Ankit Anand (Buyer)', 'buyer@theauctionsociety.com', 'Buyer', 'Active', '2026-10-20 05:30:00'],
-            ['3', 'Aryaman Annavajhala (Seller)', 'seller@theauctionsociety.com', 'Seller', 'Active', '2026-10-20 05:30:00'],
-            ['4', 'Sachin (Member - Both)', 'member@theauctionsociety.com', 'Both', 'Active', '2026-10-20 05:30:00']
+            ['1', 'System', 'Administrator', 'admin@theauctionsociety.com', 'Admin', 'Active'],
+            ['2', 'Ankit', 'Anand', 'buyer@theauctionsociety.com', 'Buyer', 'Active'],
+            ['3', 'Aryaman', 'Annavajhala', 'seller@theauctionsociety.com', 'Seller', 'Active'],
+            ['4', 'Sachin', 'Tendulkar', 'member@theauctionsociety.com', 'Both', 'Active']
+          ]
+        }
+      },
+      user_phone: {
+        title: 'TABLE 2: USER_PHONE (Weak Entity & Multivalued Attribute Phone Ledger)',
+        badge: 'Weak Entity',
+        summary: 'Multivalued attribute representation for user contact numbers. Modeled as a weak entity connected via identifying relationship "has" (double diamond in ER diagram) with total participation.',
+        proof: 'Eliminates multivalued repeating groups (satisfying 1NF). The composite primary key (user_id, phone_no) directly depends on the owner entity USERS.',
+        columns: [
+          { name: 'user_id', type: 'INT', constraints: 'FOREIGN KEY → USERS(user_id), NOT NULL', desc: 'Identifying owner foreign key from USERS.' },
+          { name: 'phone_no', type: 'VARCHAR(20)', constraints: 'NOT NULL', desc: 'Discriminator partial key for the contact number.' }
+        ],
+        ddl: `CREATE TABLE user_phone (
+    user_id INT NOT NULL,
+    phone_no VARCHAR(20) NOT NULL,
+    CONSTRAINT pk_user_phone PRIMARY KEY (user_id, phone_no),
+    CONSTRAINT fk_user_phone_user FOREIGN KEY (user_id) REFERENCES users(user_id)
+);`,
+        relations: [
+          'N : 1 with USERS — Weak entity identifying relationship: multiple phone numbers belong to one user.'
+        ],
+        sample: {
+          headers: ['user_id', 'phone_no'],
+          rows: [
+            ['1', '+91-9820011111'],
+            ['2', '+91-9820022222'],
+            ['2', '+91-9820022223'],
+            ['3', '+91-9820033333'],
+            ['4', '+91-9820044444']
           ]
         }
       },
@@ -946,32 +981,37 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
         title: 'TABLE 3: ITEM (Consigned Lot Master Specification - Exp-1 DDL)',
         badge: '3NF Verified',
         summary: 'Physical consignment master entity. Represents physical goods independently of temporary commercial auction instances, preserving consignment history.',
-        proof: 'Decoupling ITEM from AUCTION eliminates update anomalies. Attributes describe physical goods (condition, location, provenance) rather than auction pricing parameters.',
+        proof: 'Decoupling ITEM from AUCTION eliminates update anomalies. Attributes describe physical goods (item_condition, location, provenance, starting_price) rather than dynamic auction pricing parameters.',
         columns: [
           { name: 'item_id', type: 'INT', constraints: 'PRIMARY KEY, AUTO_INCREMENT', desc: 'Surrogate primary key for the consigned item.' },
           { name: 'seller_id', type: 'INT', constraints: 'FOREIGN KEY → USERS(user_id), NOT NULL', desc: 'Foreign key to the seller who owns the physical lot.' },
           { name: 'category_id', type: 'INT', constraints: 'FOREIGN KEY → CATEGORY(category_id), NOT NULL', desc: 'Foreign key establishing departmental classification.' },
           { name: 'title', type: 'VARCHAR(255)', constraints: 'NOT NULL', desc: 'Editorial catalog lot title.' },
-          { name: 'condition_type', type: 'VARCHAR(50)', constraints: "NOT NULL, CHECK (condition_type IN ('New', 'Excellent', 'Very good', 'Good', 'Fair', 'Used', 'Refurbished'))", desc: 'Physical condition rating domain constraint.' },
+          { name: 'description', type: 'TEXT', constraints: 'NULL', desc: 'Comprehensive provenance, dimensions, and condition report.' },
+          { name: 'item_condition', type: 'VARCHAR(50)', constraints: "NOT NULL, CHECK (item_condition IN ('New', 'Excellent', 'Very good', 'Good', 'Fair', 'Used', 'Refurbished'))", desc: 'Physical condition rating domain constraint.' },
+          { name: 'starting_price', type: 'DECIMAL(12,2)', constraints: 'NOT NULL, DEFAULT 0.00, CHECK (starting_price >= 0)', desc: 'Initial opening consignment ask price in INR ₹.' },
           { name: 'location', type: 'VARCHAR(100)', constraints: "NOT NULL, DEFAULT 'Mumbai, Maharashtra'", desc: 'Physical consignment vault or provenance origin city.' },
           { name: 'image_url', type: 'TEXT', constraints: 'NULL', desc: 'High-resolution photographic asset URL or placeholder reference.' },
-          { name: 'description', type: 'TEXT', constraints: 'NULL', desc: 'Comprehensive provenance, dimensions, and condition report.' },
-          { name: 'created_at', type: 'TIMESTAMP', constraints: 'DEFAULT CURRENT_TIMESTAMP', desc: 'Consignment intake timestamp.' }
+          { name: 'listed_at', type: 'TIMESTAMP', constraints: 'DEFAULT CURRENT_TIMESTAMP', desc: 'Consignment intake timestamp.' }
         ],
         ddl: `CREATE TABLE item (
     item_id INT AUTO_INCREMENT,
     seller_id INT NOT NULL,
     category_id INT NOT NULL,
     title VARCHAR(255) NOT NULL,
-    condition_type VARCHAR(50) NOT NULL,
+    description TEXT,
+    item_condition VARCHAR(50) NOT NULL DEFAULT 'Good',
+    condition_type VARCHAR(50) NOT NULL DEFAULT 'Good',
+    starting_price DECIMAL(12,2) NOT NULL DEFAULT 0.00,
     location VARCHAR(100) NOT NULL DEFAULT 'Mumbai, Maharashtra',
     image_url TEXT,
-    description TEXT,
+    listed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT pk_item PRIMARY KEY (item_id),
     CONSTRAINT fk_item_seller FOREIGN KEY (seller_id) REFERENCES users(user_id),
     CONSTRAINT fk_item_category FOREIGN KEY (category_id) REFERENCES category(category_id),
-    CONSTRAINT chk_item_condition CHECK (condition_type IN ('New', 'Excellent', 'Very good', 'Good', 'Fair', 'Used', 'Refurbished'))
+    CONSTRAINT chk_item_condition CHECK (item_condition IN ('New', 'Excellent', 'Very good', 'Good', 'Fair', 'Used', 'Refurbished')),
+    CONSTRAINT chk_item_starting_price CHECK (starting_price >= 0)
 );`,
         relations: [
           'N : 1 with USERS — Multiple consigned items belong to one consignor (seller_id).',
@@ -979,20 +1019,20 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
           '1 : 1 with AUCTION — Each physical item corresponds to an auction lot instance (AUCTION.item_id).'
         ],
         sample: {
-          headers: ['item_id', 'seller_id', 'category_id', 'title', 'condition_type', 'location'],
+          headers: ['item_id', 'seller_id', 'category_id', 'title', 'item_condition', 'starting_price'],
           rows: [
-            ['1', '3', '1', 'The Genesis Chronograph 1984', 'Excellent', 'Mumbai, Maharashtra'],
-            ['2', '3', '2', 'Dutch Masters Floral Still Life (c. 1675)', 'Good', 'Pune, Maharashtra'],
-            ['3', '3', '3', 'Porsche Panamera Turbo Executive Edition', 'Very good', 'Mumbai, Maharashtra'],
-            ['7', '7', '6', 'harry potter books', 'Excellent', 'Mumbai, Maharashtra']
+            ['1', '3', '1', 'The Genesis Chronograph 1984', 'Excellent', '₹65,000'],
+            ['2', '3', '2', 'Dutch Masters Floral Still Life (c. 1675)', 'Good', '₹15,000'],
+            ['3', '3', '3', 'Porsche Panamera Turbo Executive Edition', 'Very good', '₹1,50,000'],
+            ['7', '3', '1', 'Audemars Piguet Royal Oak Offshore 2022', 'New', '₹2,50,000']
           ]
         }
       },
       auction: {
         title: 'TABLE 4: AUCTION (Temporal Bidding Instances & Limits - Exp-1 DDL)',
         badge: '3NF Verified',
-        summary: 'Commercial transaction parameters, timing boundaries, reserve thresholds, and live high-bid state. Validated via CHECK constraints and triggers.',
-        proof: 'Maintains 3NF by storing temporal pricing metrics separately from physical lot attributes. winner_id is populated only upon conclusion.',
+        summary: 'Commercial transaction parameters, timing boundaries, reserve thresholds, and live highest-bid state. Validated via CHECK constraints and triggers.',
+        proof: 'Maintains 3NF by storing temporal pricing metrics separately from physical lot attributes. highest_bid and time_remaining are derived attributes.',
         columns: [
           { name: 'auction_id', type: 'INT', constraints: 'PRIMARY KEY, AUTO_INCREMENT', desc: 'Primary key identifying the auction session.' },
           { name: 'item_id', type: 'INT', constraints: 'FOREIGN KEY → ITEM(item_id), UNIQUE, NOT NULL', desc: 'Foreign key linking the physical consignment.' },
@@ -1000,9 +1040,40 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
           { name: 'reserve_price', type: 'DECIMAL(12,2)', constraints: 'NOT NULL, CHECK (reserve_price >= starting_price)', desc: 'Confidential minimum hammer price required for sale.' },
           { name: 'min_increment', type: 'DECIMAL(10,2)', constraints: 'NOT NULL, DEFAULT 100.00, CHECK (min_increment > 0)', desc: 'Minimum amount a new bid must exceed the current high bid.' },
           { name: 'current_bid', type: 'DECIMAL(12,2)', constraints: 'NOT NULL, DEFAULT 0.00, CHECK (current_bid >= 0)', desc: 'Current highest bid.' },
+          { name: 'highest_bid', type: 'DECIMAL(12,2)', constraints: 'DERIVED ATTRIBUTE (synced via trigger)', desc: 'ER Diagram derived highest bid.' },
+          { name: 'final_price', type: 'DECIMAL(12,2)', constraints: 'NULL', desc: 'Final hammer price realized upon closing.' },
           { name: 'bid_count', type: 'INT', constraints: 'NOT NULL, DEFAULT 0, CHECK (bid_count >= 0)', desc: 'Total count of valid bids recorded.' },
           { name: 'winner_id', type: 'INT', constraints: 'FOREIGN KEY → USERS(user_id), NULL', desc: 'Designated winner once closed with reserve met.' },
           { name: 'status', type: 'VARCHAR(20)', constraints: "NOT NULL, DEFAULT 'Active', CHECK (status IN ('Active', 'Closed', 'Cancelled'))", desc: 'Lifecycle state domain constraint.' },
+          { name: 'start_time', type: 'DATETIME', constraints: 'NOT NULL', desc: 'Exact date and time bidding opens.' },
+          { name: 'end_time', type: 'DATETIME', constraints: 'NOT NULL, CHECK (end_time > start_time)', desc: 'Exact date and time bidding closes.' },
+          { name: 'time_remaining', type: 'INTEGER', constraints: 'DERIVED ATTRIBUTE (view computed)', desc: 'Dynamic seconds remaining until end_time.' }
+        ],
+        ddl: `CREATE TABLE auction (
+    auction_id INT AUTO_INCREMENT,
+    item_id INT NOT NULL,
+    starting_price DECIMAL(12,2) NOT NULL,
+    reserve_price DECIMAL(12,2) NOT NULL,
+    min_increment DECIMAL(10,2) NOT NULL DEFAULT 100.00,
+    current_bid DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    highest_bid DECIMAL(12,2) NOT NULL DEFAULT 0.00,
+    final_price DECIMAL(12,2) NULL,
+    bid_count INT NOT NULL DEFAULT 0,
+    winner_id INT NULL,
+    status VARCHAR(20) NOT NULL DEFAULT 'Active',
+    start_time DATETIME NOT NULL,
+    end_time DATETIME NOT NULL,
+    CONSTRAINT pk_auction PRIMARY KEY (auction_id),
+    CONSTRAINT uq_auction_item UNIQUE (item_id),
+    CONSTRAINT fk_auction_item FOREIGN KEY (item_id) REFERENCES item(item_id),
+    CONSTRAINT fk_auction_winner FOREIGN KEY (winner_id) REFERENCES users(user_id),
+    CONSTRAINT chk_auction_starting_price CHECK (starting_price > 0),
+    CONSTRAINT chk_auction_min_increment CHECK (min_increment > 0),
+    CONSTRAINT chk_auction_reserve CHECK (reserve_price >= starting_price),
+    CONSTRAINT chk_auction_status CHECK (status IN ('Active', 'Closed', 'Cancelled')),
+    CONSTRAINT chk_auction_time CHECK (end_time > start_time),
+    CONSTRAINT chk_auction_bid_count CHECK (bid_count >= 0)
+);`,
           { name: 'start_time', type: 'DATETIME', constraints: 'NOT NULL', desc: 'Exact date and time bidding opens.' },
           { name: 'end_time', type: 'DATETIME', constraints: 'NOT NULL, CHECK (end_time > start_time)', desc: 'Exact date and time bidding closes.' }
         ],
@@ -1554,98 +1625,108 @@ If an error or network drop occurs between step 2 and 3, ROLLBACK is executed, r
     if (tabName === 'schema') {
       wrap.innerHTML = `
         <div style="margin-bottom:14px; font-size:13px; color:#555;">
-          ✦ <strong>Exp-1 Relational Schema with Integrity Constraints</strong> — Click or tap any table below to inspect its full column specifications, primary/foreign keys, CHECK constraints, and executable DDL.
+          ✦ <strong>Exp-1 Relational Schema with Integrity Constraints</strong> — Aligned with the Section 5 ER Diagram. Click or tap any table below to inspect its full column specifications, composite keys, weak entities, CHECK constraints, and executable DDL.
         </div>
         <div class="schema-entities-grid">
           <div class="schema-entity-card" data-arch-type="entities" data-arch-key="users">
             <div class="schema-entity-header"><span>1. USERS</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> user_id INT AUTO_INCREMENT<br/>
+              first_name VARCHAR(50) NOT NULL<br/>
+              last_name VARCHAR(50) NOT NULL<br/>
               name VARCHAR(100) NOT NULL<br/>
               email VARCHAR(255) UNIQUE NOT NULL<br/>
-              password_hash CHAR(128) NOT NULL<br/>
               role VARCHAR(20) CHECK (role IN (...))<br/>
               status VARCHAR(20) DEFAULT 'Active'<br/>
-              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            </div>
+            <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
+          </div>
+          <div class="schema-entity-card" data-arch-type="entities" data-arch-key="user_phone">
+            <div class="schema-entity-header"><span>2. USER_PHONE</span><span class="badge-square gold">WEAK ENTITY</span></div>
+            <div class="schema-entity-fields">
+              <strong>PK (Composite):</strong> (user_id, phone_no)<br/>
+              <strong>FK:</strong> user_id → USERS(user_id)<br/>
+              phone_no VARCHAR(20) NOT NULL<br/>
+              <em>Identifying relation: "has" (total participation)</em>
             </div>
             <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
           <div class="schema-entity-card" data-arch-type="entities" data-arch-key="category">
-            <div class="schema-entity-header"><span>2. CATEGORY</span><span class="badge-square green">3NF</span></div>
+            <div class="schema-entity-header"><span>3. CATEGORY</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> category_id INT AUTO_INCREMENT<br/>
-              name VARCHAR(100) UNIQUE NOT NULL<br/>
+              category_name VARCHAR(100) UNIQUE NOT NULL<br/>
               slug VARCHAR(100) UNIQUE NOT NULL<br/>
               description TEXT
             </div>
             <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
           <div class="schema-entity-card" data-arch-type="entities" data-arch-key="item">
-            <div class="schema-entity-header"><span>3. ITEM</span><span class="badge-square green">3NF</span></div>
+            <div class="schema-entity-header"><span>4. ITEM</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> item_id INT AUTO_INCREMENT<br/>
               <strong>FK:</strong> seller_id → USERS(user_id)<br/>
               <strong>FK:</strong> category_id → CATEGORY(category_id)<br/>
               title VARCHAR(255) NOT NULL<br/>
-              condition_type VARCHAR(50) CHECK (...)<br/>
-              location VARCHAR(100) DEFAULT 'Mumbai'<br/>
-              image_url TEXT
+              item_condition VARCHAR(50) CHECK (...)<br/>
+              starting_price DECIMAL(12,2) CHECK (>= 0)<br/>
+              listed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             </div>
             <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
           <div class="schema-entity-card" data-arch-type="entities" data-arch-key="auction">
-            <div class="schema-entity-header"><span>4. AUCTION</span><span class="badge-square green">3NF</span></div>
+            <div class="schema-entity-header"><span>5. AUCTION</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> auction_id INT AUTO_INCREMENT<br/>
               <strong>FK:</strong> item_id → ITEM(item_id)<br/>
               starting_price DECIMAL(12,2) CHECK (> 0)<br/>
               reserve_price DECIMAL(12,2) CHECK (>= start)<br/>
-              min_increment DECIMAL(10,2) DEFAULT 100.00<br/>
-              current_bid DECIMAL(12,2) DEFAULT 0.00<br/>
-              bid_count INT DEFAULT 0 CHECK (>= 0)<br/>
+              highest_bid DECIMAL(12,2) <em>[Derived]</em><br/>
+              time_remaining INT <em>[Derived]</em><br/>
+              final_price DECIMAL(12,2) NULL<br/>
               <strong>FK:</strong> winner_id → USERS(user_id)<br/>
-              status VARCHAR(20) CHECK (IN ('Active',...))<br/>
-              end_time DATETIME CHECK (> start_time)
+              status VARCHAR(20) CHECK (IN ('Active',...))
             </div>
             <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
           <div class="schema-entity-card" data-arch-type="entities" data-arch-key="bid">
-            <div class="schema-entity-header"><span>5. BID</span><span class="badge-square green">3NF</span></div>
+            <div class="schema-entity-header"><span>6. BID</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> bid_id INT AUTO_INCREMENT<br/>
               <strong>FK:</strong> auction_id → AUCTION(auction_id)<br/>
               <strong>FK:</strong> bidder_id → USERS(user_id)<br/>
-              amount DECIMAL(12,2) CHECK (amount > 0)<br/>
+              bid_amount DECIMAL(12,2) CHECK (> 0)<br/>
               bid_time TIMESTAMP DEFAULT CURRENT_TIMESTAMP<br/>
-              is_winning INT DEFAULT 0 CHECK (IN (0, 1))<br/>
-              ip_address VARCHAR(45)
+              is_winning INT DEFAULT 0
             </div>
             <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
           <div class="schema-entity-card" data-arch-type="entities" data-arch-key="payment">
-            <div class="schema-entity-header"><span>6. PAYMENT</span><span class="badge-square green">3NF</span></div>
+            <div class="schema-entity-header"><span>7. PAYMENT</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> payment_id INT AUTO_INCREMENT<br/>
               <strong>FK:</strong> auction_id → AUCTION(auction_id)<br/>
               <strong>FK:</strong> payer_id → USERS(user_id)<br/>
               amount DECIMAL(12,2) CHECK (amount > 0)<br/>
-              payment_status VARCHAR(20) DEFAULT 'Pending'<br/>
-              paid_at TIMESTAMP NULL
+              payment_method VARCHAR(50)<br/>
+              due_by DATETIME<br/>
+              status VARCHAR(20) DEFAULT 'Pending'
             </div>
             <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
           <div class="schema-entity-card" data-arch-type="entities" data-arch-key="watchlist">
-            <div class="schema-entity-header"><span>7. WATCHLIST</span><span class="badge-square green">3NF</span></div>
+            <div class="schema-entity-header"><span>8. WATCHLIST</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK (Composite):</strong> (user_id, auction_id)<br/>
               <strong>FK:</strong> user_id → USERS(user_id)<br/>
               <strong>FK:</strong> auction_id → AUCTION(auction_id)<br/>
-              created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+              added_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
             </div>
             <div class="schema-card-tap-hint"><span>TAP TO INSPECT FULL SQL DDL</span><span>↗</span></div>
           </div>
           <div class="schema-entity-card" data-arch-type="entities" data-arch-key="audit_log">
-            <div class="schema-entity-header"><span>8. AUDIT_LOG</span><span class="badge-square green">3NF</span></div>
+            <div class="schema-entity-header"><span>9. AUDIT_LOG</span><span class="badge-square green">3NF</span></div>
             <div class="schema-entity-fields">
               <strong>PK:</strong> log_id INT AUTO_INCREMENT<br/>
               event_type VARCHAR(50) CHECK (...)<br/>

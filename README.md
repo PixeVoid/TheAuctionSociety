@@ -2,7 +2,7 @@
 ### High-Concurrency Editorial Auction Engine & Academic DBMS Mini-Project
 **Bharatiya Vidya Bhavan's Sardar Patel Institute of Technology (SPIT, Mumbai)**  
 **Course**: Relational Database Management Systems (RDBMS)  
-**Target Engine**: MySQL 8.0+ (InnoDB, 3NF/BCNF, Triggers, Views, Events)
+**Target Engine**: MySQL 8.4+ (InnoDB, 3NF Relational Schema, Triggers, Views, Events, TCL)
 
 ---
 
@@ -12,176 +12,181 @@
 
 ---
 
-## ⚡ Quick Start (1 Command Launch)
+## ⚡ Quick Start: Launching Frontend & Backend
 
-No third-party packages or heavy installs required. Runs natively on standard **Node.js (v18+)**:
+The project uses a **unified single-process architecture**. Both the responsive frontend (HTML, CSS, JS, authentic typography) and the high-concurrency REST API run on **`http://localhost:3000`** with zero CORS issues.
 
 ```bash
-# 1. Start the server (demo accounts are bootstrapped automatically):
+# 1. Ensure local MySQL service is running
+sudo systemctl start mysqld
+
+# 2. Start the unified server (Node.js v18+)
 npm start
+# (Or alternatively: node server.js)
 
-# (Optional: override administrator credentials via environment variables)
-ADMIN_EMAIL="admin@theauctionsociety.com" ADMIN_PASSWORD="admin12345" npm start
-
-# 2. Open in your browser:
+# 3. Open your browser:
 http://localhost:3000
 ```
 
-> **Pre-configured Accounts for Viva Demonstration**:
-> - **Administrator**: `admin@theauctionsociety.com` (or `admin@theauctionsociety.internal`) / `admin12345`
-> - **Buyer**: `buyer@theauctionsociety.com` (or `buyer@theauctionsociety.internal`) / `buyer12345`
-> - **Seller**: `seller@theauctionsociety.com` (or `seller@theauctionsociety.internal`) / `seller12345`
-> - **Both (Buyer & Seller)**: `member@theauctionsociety.com` (or `both@theauctionsociety.com`) / `both12345`
-
-### 🌐 Live Production Deployment
-* **Vercel Live URL**: [https://the-auction-society.vercel.app](https://the-auction-society.vercel.app)
-* **GitHub Repository**: [https://github.com/PixeVoid/TheAuctionSociety.git](https://github.com/PixeVoid/TheAuctionSociety.git)
-* **Serverless Architecture**: Configured via `vercel.json` with edge static asset caching (`handle: "filesystem"`) and automated Node.js serverless routing for `/api/*` endpoints.
+> **Pre-configured Accounts for Testing & Viva Demonstrations**:
+> - **Administrator**: `admin@theauctionsociety.com` / `admin12345`
+> - **Buyer**: `buyer@theauctionsociety.com` / `buyer12345`
+> - **Seller**: `seller@theauctionsociety.com` / `seller12345`
+> - **Both (Buyer & Seller)**: `member@theauctionsociety.com` / `both12345` *(Sachin)*
 
 ---
 
-## 🗺️ Visual Architecture Map (Pictograph)
+## 🗄️ Local MySQL Database & MySQL Workbench Connection
 
-```
-========================================================================================
-                          BROWSER CLIENT (EDITORIAL FRONTEND)
-========================================================================================
-   [ index.html ]        [ catalog.html ]       [ architecture.html ]   [ system-log.html ]   [ account.html ]
-   Editorial Hero        Live Bidding Grid      SPIT 3NF Schema         Admin Moderation      Member Dashboard
-   Featured Lots         Search & Filters       Triggers & ACID View    Audit Log Stream      Auth / My Lots
-         │                      │                      │                       │                     │
-         └──────────────────────┴───────────────┬──────┴───────────────────────┴─────────────────────┘
-                                                │ REST API Calls (fetch) + HTTP-Only Session Cookie
-                                                ▼
-========================================================================================
-                       UNIFIED BACKEND ENGINE (server.js @ Port 3000)
-========================================================================================
-  ┌──────────────────────────────────────────────────────────────────────────────────┐
-  │                               HTTP ROUTER & STATIC FILES                          │
-  │  - Serves static assets: CSS (CRT Shaders), JS, Fonts (FK Raster, Space Grotesk)  │
-  │  - Resolves extensionless clean URLs: /catalog, /architecture, /account, etc.     │
-  └─────────────────────────────────────┬────────────────────────────────────────────┘
-                                        │
-           ┌────────────────────────────┼─────────────────────────────┐
-           ▼                            ▼                             ▼
-  ┌─────────────────┐          ┌──────────────────┐          ┌───────────────────┐
-  │  AUTH & RBAC    │          │ AUCTION LIFECYCLE│          │   ADMIN DESK      │
-  │  Scrypt Hashing │          │ 30s Expiry Daemon│          │   Category Editor │
-  │  Session Tokens │          │ Winner Picker    │          │   Member Status   │
-  │  Buyer / Seller │          │ 48h Payment Lock │          │   Live Audit Log  │
-  └────────┬────────┘          └────────┬─────────┘          └─────────┬─────────┘
-           │                            │                              │
-           └────────────────────────────┼──────────────────────────────┘
-                                        ▼
-========================================================================================
-                      CORE DATA LAYER (In-Memory -> MySQL 8.0 DDL)
-========================================================================================
-  ┌──────────────────────────────────────────────────────────────────────────────────┐
-  │  8 Relational 3NF Entities (SPIT Exp-1 DDL with Integrity Constraints):          │
-  │  users ──< item ──< auction ──< bid ──< payment                                  │
-  │     │       │          │                                                         │
-  │     │   category   watchlist                                  audit_log          │
-  │     └─────────────────────────────────────────────────────────────┘              │
-  └──────────────────────────────────────────────────────────────────────────────────┘
-```
+The backend connects directly to local MySQL 8.4 via an asynchronous connection pool (`db.js`).
+
+### 1. Connection Parameters for MySQL Workbench
+Open **MySQL Workbench**, click the **`+`** icon next to *MySQL Connections*, and enter:
+
+| Field | Configuration Value |
+|---|---|
+| **Connection Name** | `Auction Society Local` |
+| **Connection Method** | `Standard (TCP/IP)` |
+| **Hostname** | `127.0.0.1` *(or `localhost`)* |
+| **Port** | `3306` |
+| **Username** | `auction_user` *(or `root`)* |
+| **Password** | `AuctionPass123!` *(or root password `Ankitsql`)* |
+| **Default Schema** | `auction_society` |
+
+Click **Test Connection** — you will receive a green confirmation dialog: *"Successfully made the MySQL connection"*.
+
+### 2. Loading / Resetting the Database in MySQL Workbench
+1. In MySQL Workbench, click **File ➔ Open SQL Script...** and select **`schema.sql`**.
+2. Click the **Execute (Lightning Bolt ⚡)** icon.
+3. The script will drop and recreate `auction_society`, build all 9 tables, weak entities, triggers, views, and seed data.
 
 ---
 
-## 🔌 Connection Matrix: Which Page Calls Which API?
+## 🔄 Real-Time Two-Way Sync (MySQL Workbench ⇄ Live Website)
 
-| Page | Role & Purpose | API Endpoints Called | What Happens Under the Hood |
+Our backend features **live database synchronization**. Any query written in MySQL Workbench updates the website instantly upon refresh, and any action on the website commits directly to MySQL!
+
+### Test Case A: Update via MySQL Workbench ➔ Watch Website Update
+1. Open MySQL Workbench query tab and run:
+   ```sql
+   USE auction_society;
+   UPDATE auction SET current_bid = 95000.00 WHERE auction_id = 1;
+   ```
+2. In your browser, open or refresh **`http://localhost:3000/catalog.html`**.
+3. **Result**: Lot #1 (*The Genesis Chronograph 1984*) immediately renders with the updated current bid of **₹95,000**!
+
+### Test Case B: Place Bid on Website ➔ Inspect Live Rows in Workbench
+1. On **`http://localhost:3000/catalog.html`**, log in as **Buyer** (`buyer@theauctionsociety.com` / `buyer12345`).
+2. Open Lot #1 and place a bid of **₹96,000**.
+3. Switch back to MySQL Workbench and run:
+   ```sql
+   -- 1. Inspect the new atomic bid row
+   SELECT * FROM bid ORDER BY bid_id DESC LIMIT 3;
+
+   -- 2. Observe the auction state updated automatically by trigger trg_bid_audit
+   SELECT auction_id, current_bid, highest_bid, bid_count, winner_id FROM auction WHERE auction_id = 1;
+
+   -- 3. Verify the compliance audit trail inserted by the trigger
+   SELECT * FROM audit_log ORDER BY log_id DESC LIMIT 3;
+   ```
+4. **Result**: The trigger `trg_bid_audit` atomically incremented the bid counter, updated `current_bid` and `highest_bid`, set `winner_id = 2`, and appended a tamper-proof event to `audit_log`.
+
+---
+
+## 📐 Section 5 ER Diagram & 3NF Relational Mapping
+
+Our database schema (`schema.sql`) strictly mirrors the **Section 5 ER Diagram**:
+
+```
+[Category] 1 ──────<classified as>────── N [Item] 1 ──────<put up for>────── N [Auction]
+                                             │                                      │
+                                             │ lists (N:1)                          │ settled by (1:1)
+                                             ▼                                      ▼
+                                          [Users] 1 ────────<pays>──────── N [Payment]
+                                           │  │  │
+                identifying "has" (1:N)    │  │  │ places (1:N)
+                                           ▼  │  ▼
+                                  [User_Phone]│ [Bid] ◄────── receives (1:N) ──────┘
+                                (Weak Entity) │
+                                              ▼
+                                         [Watchlist] (Associative M:N Entity: added_at)
+```
+
+### Detailed Attribute & Entity Verification Matrix
+
+| ER Entity | ER Attributes (from Diagram) | Relational Table & 3NF Implementation | Theoretical Notes & Compliance |
 |---|---|---|---|
-| **`index.html`** | Editorial landing & brand showcase | `GET /api/auctions` | Fetches active lots for the featured lots teaser slider. |
-| **`catalog.html`** | Transactional browsing & bidding | `GET /api/categories`<br>`GET /api/auctions`<br>`POST /api/auctions/:id/bid`<br>`POST /api/auctions/:id/watchlist` | - Filters/sorts auctions in real-time.<br>- Submits atomic bids (checks minimum increment & self-bid).<br>- Toggles saved lots to member watchlist. |
-| **`architecture.html`** | Academic DBMS showcase | *Static / Informational* | Demonstrates the 8-table schema (Exp-1), SQL triggers (Exp-5), Joins/Views/Subqueries (Exp-4), 3NF normalization, and ACID concurrency engine to professors. |
-| **`system-log.html`** | Admin desk & audit ledger | `GET /api/admin/dashboard`<br>`POST /api/admin/categories`<br>`PATCH /api/admin/users/:id/status`<br>`POST /api/admin/auctions/:id/cancel` | - Streams live audit history.<br>- Adds/renames auction categories.<br>- Blocks/unblocks fraudulent users.<br>- Forces emergency auction cancellations. |
-| **`account.html`** | Member login, register & dashboard | `POST /api/auth/register`<br>`POST /api/auth/login`<br>`POST /api/auth/logout`<br>`GET /api/me`<br>`GET /api/dashboard`<br>`POST /api/listings`<br>`POST /api/auctions/:id/payment` | - Registers new users as Buyer, Seller, or Both.<br>- Logs in and receives secure session cookie.<br>- Displays user's active bids, won lots, and watchlist.<br>- Allows sellers to create new auction listings.<br>- Simulates 48-hour payment settlement for winners. |
+| **`Category`** | `category_id` (PK), `category_name`, `description` | `category(category_id, category_name, name, slug, description)` | 1:N relationship `classified as` with Item. Total participation on Item. |
+| **`Users`** | `user_id` (PK), `name` (Composite: `first_name`, `last_name`), `email`, `registered_at`, `status`, `role` | `users(user_id, first_name, last_name, name, email, role, status, registered_at, password_hash, password_salt)` | Composite attribute `name` decomposed into atomic `first_name` and `last_name` (1NF). Synchronized automatically via `trg_users_before_insert`. |
+| **`User_Phone`** | `user_id` (FK), `phone_no` (Partial Key) | `user_phone(user_id, phone_no)` *(Composite PK: user_id + phone_no)* | **Weak Entity** connected via identifying relationship `has` (double diamond). Models multivalued contact numbers without repeating groups. |
+| **`Item`** | `item_id` (PK), `title`, `description`, `item_condition`, `starting_price`, `listed_at` | `item(item_id, seller_id, category_id, title, description, item_condition, condition_type, starting_price, location, image_url, listed_at)` | Decoupled physical lot specification. `starting_price` and `item_condition` preserved from ER diagram. |
+| **`Auction`** | `auction_id` (PK), `start_time`, `end_time`, `final_price`, `reserve_price`, `min_increment`, `status`, `highest_bid` *(Derived)*, `time_remaining` *(Derived)* | `auction(auction_id, item_id, starting_price, reserve_price, min_increment, current_bid, highest_bid, final_price, bid_count, winner_id, status, start_time, end_time)` | Derived attribute `highest_bid` maintained by trigger; derived attribute `time_remaining` computed dynamically via `TIMESTAMPDIFF(SECOND, NOW(), end_time)` in view `active_auctions_view`. |
+| **`Bid`** | `bid_id` (PK), `bid_amount`, `bid_time` | `bid(bid_id, auction_id, bidder_id, bid_amount, amount, bid_time, is_winning, ip_address)` | Append-only ledger. Pre-validated by trigger `trg_bid_validate`. |
+| **`Payment`** | `payment_id` (PK), `amount`, `payment_method`, `due_by`, `paid_at`, `status` | `payment(payment_id, auction_id, payer_id, amount, payment_method, due_by, deadline_at, paid_at, status, payment_status, transaction_ref)` | 1:1 settlement ledger with Auction. Unique constraint on `auction_id` ensures exactly one settlement per lot. |
+| **`Watchlist`** | `user_id` (PK), `auction_id` (PK), `added_at` | `watchlist(user_id, auction_id, added_at, created_at)` | Associative entity resolving M:N relationship `watches` with temporal attribute `added_at`. |
+| **`Audit_Log`** | Compliance ledger | `audit_log(log_id, event_type, user_id, auction_id, summary, ip_address, created_at)` | Exp-5 compliance ledger populated by database triggers. |
+
+> **College Curriculum Rules Strictly Maintained**:
+> - 🚫 **Zero `CASCADE`**: Explicit referential constraints preventing silent cascade deletes.
+> - 🚫 **Zero `UNSIGNED`**: Strictly standard ANSI SQL `INT` and `DECIMAL(12,2)`.
+> - 🚫 **Zero `ENUM`**: Replaced with declarative ANSI SQL `CHECK (...)` domain constraints.
 
 ---
 
-## 🔄 Auction & Bidding Lifecycle (State Machine)
+## 🧪 Automated Testing & Verification
 
+### 1. Database-Only SQL Stress Test (6 Test Suites)
+Tests relational integrity, self-bidding prevention trigger, minimum increment enforcement, trigger state updates, and TCL savepoint rollback:
+```bash
+mysql -h 127.0.0.1 -u auction_user -p'AuctionPass123!' < stress_test.sql
+# Output: ALL 6 TEST SUITES EXECUTED WITH 100% SUCCESS!
 ```
-  [ Seller Form ]
-        │
-        ▼ (POST /api/listings)
-  ┌───────────┐         Starts at Start Time
-  │ SCHEDULED │ ──────────────────────────────────────┐
-  └───────────┘                                       ▼
-        │                                       ┌───────────┐
-        │ Cancelled by Admin / Seller           │  ACTIVE   │ ◄───┐
-        ▼                                       └─────┬─────┘     │
-  ┌───────────┐                                       │           │ Atomic Bids
-  │ CANCELLED │                                       │ Bidding   │ (POST /api/auctions/:id/bid)
-  └───────────┘                                       ▼           │
-                                                [ Bid Validation ] ──┘
-                                                - User != Seller?
-                                                - Bid >= Current + Min Increment?
-                                                - Auction status == ACTIVE?
-                                                - Timestamp tie-breaker?
-                                                      │
-                                                      │ 30s Server Clock Ticks
-                                                      ▼ End Time Elapsed
-                                                ┌───────────┐
-                                                │  CLOSED   │
-                                                └─────┬─────┘
-                                                      │
-                            ┌─────────────────────────┴────────────────────────┐
-                            ▼                                                  ▼
-                  Reserve Price Met?                                 Reserve Not Met?
-                            │                                                  │
-                            ▼                                                  ▼
-                     [ Winner Picked ]                                   [ No Sale ]
-                            │                                                  │
-                            ▼                                                  ▼
-                   ┌─────────────────┐                                  ┌─────────────┐
-                   │ PAYMENT PENDING │                                  │ UNSOLD_LOT  │
-                   └────────┬────────┘                                  └─────────────┘
-                            │
-                            │ Buyer Settles (POST /api/auctions/:id/payment)
-                            ▼
-                   ┌─────────────────┐
-                   │      PAID       │ (Simulated 48h settlement)
-                   └─────────────────┘
+
+### 2. Full-Stack End-to-End Stress Test (29 Tests)
+Tests frontend static delivery, MySQL triggers, auth cookies, REST bidding engine, seller lot creation, watchlist toggling, and 50 simultaneous high-concurrency requests:
+```bash
+node test_full_stack_stress.js
+# Output: 29/29 TESTS PASSED (100% SUCCESS)
 ```
 
 ---
 
-## 🎓 Professor Viva Cheat-Sheet (Top 5 Questions & Answers)
+## 🎓 Top Professor Viva Questions & Answers
 
-### Q1: "How do you run the frontend and backend together?"
+### Q1: "How did you map the weak entity and multivalued attributes from the ER diagram?"
 > **Answer**:  
-> The project runs on a **unified local origin** (`http://localhost:3000`) powered by Node.js built-in `http` module with **zero external npm dependencies**. The server serves the HTML/CSS/JS frontend files statically and handles all `/api/*` REST endpoints on the exact same port, preventing CORS errors.
+> In Section 5 of our ER diagram, `User_Phone` is a weak entity connected to `Users` via the identifying relationship `has` with total participation. In relational 3NF (`schema.sql`), this is mapped to a dedicated relation `user_phone(user_id, phone_no)` with a composite primary key `(user_id, phone_no)`. This satisfies First Normal Form (1NF) by eliminating multivalued repeating groups while enforcing referential integrity back to `users(user_id)`.
 
-### Q2: "How does the system prevent race conditions when two people bid at the exact same millisecond?"
+### Q2: "How are the derived attributes from the ER diagram handled in SQL?"
 > **Answer**:  
-> In Node.js, request processing on the event loop is single-threaded. Each bid evaluation (reading current price, checking the minimum increment, verifying the user is not the seller, and writing the new high bid) executes **atomically within a synchronous turn**. In MySQL, this is enforced using `SELECT ... FOR UPDATE` row-level locks and `SERIALIZABLE` transaction isolation in InnoDB.
+> In our ER diagram, `highest_bid` and `time_remaining` are drawn with dashed ovals, indicating they are derived attributes. In SQL:
+> 1. `highest_bid` is maintained in `auction` via the database trigger `trg_bid_audit`, which atomically synchronizes `highest_bid = NEW.bid_amount` upon every valid bid.
+> 2. `time_remaining` is computed dynamically in the database view `active_auctions_view` using `TIMESTAMPDIFF(SECOND, NOW(), a.end_time)`, avoiding stale data storage.
 
-### Q3: "How is user authentication secured?"
+### Q3: "How does your system prevent race conditions when two buyers bid simultaneously?"
 > **Answer**:  
-> Passwords are never stored in plaintext. They are hashed using Node.js's native **`crypto.scrypt`** algorithm with unique random 16-byte cryptographic salts. Authenticated sessions use randomized 64-character hex tokens stored in server memory and delivered via **`HttpOnly; SameSite=Lax`** cookies to protect against XSS and CSRF attacks.
+> At the database layer, concurrency is secured using InnoDB row-level locking (`SELECT ... FOR UPDATE`) and ACID serializable transaction boundaries. The database trigger `trg_bid_validate` verifies that the incoming bid strictly exceeds `current_bid + min_increment` before allowing insertion. In Node.js, the event loop handles bid evaluations synchronously per tick.
 
-### Q4: "How does the site close auctions automatically without a cron job?"
+### Q4: "Show me how MySQL Workbench updates reflect on the website in real time."
 > **Answer**:  
-> The backend runs a lightweight 30-second interval timer daemon (`setInterval`). Every 30 seconds, it queries for auctions whose `endTime <= now` and status is `ACTIVE`. It automatically marks them `CLOSED`, evaluates whether the reserve price was met, designates the highest bidder as the winner, and generates a payment obligation with a 48-hour deadline.
-
-### Q5: "Where are the team members credited and how is academic DBMS represented?"
-> **Answer**:  
-> Architects **Ankit Anand** (`2025800005`) and **Aryaman Annavajhala** (`2025800006`) are showcased on the home page ([index.html](file:///home/void/Documents/antigravity/bold-heisenberg/index.html)) with pixel-art hover cards. The dedicated [architecture.html](file:///home/void/Documents/antigravity/bold-heisenberg/architecture.html) page details the 8-entity relational schema (Exp-1), 3NF normalization proofs, SQL triggers (Exp-5: `trg_bid_validate`, `trg_bid_audit`), analytical views & subqueries (Exp-4), and ACID compliance model.
+> Our Node.js backend connects to MySQL using a connection pool. Every catalog or lot query invokes `syncFromDatabase()`, reading directly from the `auction`, `item`, and `category` tables. Running an `UPDATE auction SET current_bid = 95000 WHERE auction_id = 1;` in MySQL Workbench updates the database immediately, and refreshing the browser renders the updated price instantly.
 
 ---
 
-## 📁 Repository File Map
+## 📁 Repository Structure
 
 ```
-├── index.html            # Landing page (Hero, stickers, manifesto, team cards, footer)
-├── catalog.html          # Transactional catalog (Search, category filters, bidding modal)
-├── architecture.html     # Academic DBMS showcase (Schema, 3NF proofs, triggers, ACID)
+├── index.html            # Landing page (Editorial hero, manifesto, team cards)
+├── catalog.html          # Transactional catalog (Search, category filters, live bidding)
+├── architecture.html     # Academic DBMS showcase (Interactive schema inspection, triggers, ACID)
 ├── system-log.html       # Admin desk & real-time transaction audit ledger
-├── account.html          # Member authentication & dashboard (Bids, listings, watchlist)
-├── server.js             # Dependency-free Node.js HTTP server & REST API (Port 3000)
-├── style.css             # Unified CSS (Design Society theme, CRT scanlines, layouts)
-├── script.js             # Global interactivity (Lenis smooth scroll, scramblers, nav)
-├── fonts/                # Authentic bespoke fonts (FK Raster Roman, Space Grotesk, KH Teka)
-└── assets/               # Pixel-art SVG stickers, crests, and media
+├── account.html          # Member authentication & dashboard (Bids, listings, watchlist, payments)
+├── server.js             # High-concurrency Node.js HTTP server & REST API (Port 3000)
+├── db.js                 # MySQL 8.4 connection pool & health checker
+├── schema.sql            # Master DDL with 3NF tables, weak entities, triggers, views, & TCL
+├── stress_test.sql       # 6-suite automated database stress test
+├── test_full_stack_stress.js # 29-test end-to-end full-stack verification script
+├── style.css             # Unified editorial CSS with CRT scanlines & responsive grids
+├── script.js             # Interactive client-side logic & architecture inspectors
+└── assets/               # Photographic lot assets and SVG placeholders
 ```

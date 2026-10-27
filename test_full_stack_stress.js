@@ -197,6 +197,7 @@ async function runFullStackStressTest() {
     image: 'assets/placeholder.svg',
     description: 'Rare 18th century brass navigational astrolabe with engraved celestial coordinates.'
   }, { Cookie: sellerCookie });
+  if (createListRes.status !== 201) console.error('CREATE LISTING FAILED:', createListRes.status, createListRes.json);
   assert(createListRes.status === 201, 'Seller successfully created new consignment lot (HTTP 201)');
 
   // Verify item and auction in MySQL

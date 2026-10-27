@@ -175,6 +175,57 @@ function closeExpiredAuctions() {
   }
 }
 
+async function syncFromDatabase() {
+  if (!db.isConnected) return;
+  try {
+    const [aucRows] = await db.pool.execute(`
+      SELECT 
+        a.auction_id as id, 
+        i.title, 
+        COALESCE(c.name, c.category_name) as category, 
+        COALESCE(i.condition_type, i.item_condition) as \`condition\`, 
+        a.current_bid as currentBid, 
+        a.starting_price as startingPrice, 
+        a.reserve_price as reservePrice, 
+        a.min_increment as minIncrement, 
+        a.bid_count as bidCount, 
+        UNIX_TIMESTAMP(a.end_time)*1000 as endsAt, 
+        a.status, 
+        u.name as seller, 
+        i.seller_id as ownerId, 
+        a.winner_id as winnerId, 
+        i.location, 
+        COALESCE(i.image_url, 'assets/placeholder.svg') as image, 
+        i.description 
+      FROM auction a 
+      JOIN item i ON a.item_id = i.item_id 
+      JOIN category c ON i.category_id = c.category_id 
+      JOIN users u ON i.seller_id = u.user_id
+    `);
+    if (aucRows.length > 0) {
+      for (const row of aucRows) {
+        const formatted = {
+          ...row,
+          currentBid: Number(row.currentBid),
+          startingPrice: Number(row.startingPrice),
+          reservePrice: Number(row.reservePrice),
+          minIncrement: Number(row.minIncrement),
+          bidCount: Number(row.bidCount),
+          endsAt: Number(row.endsAt)
+        };
+        const existingIdx = auctions.findIndex(a => a.id === formatted.id);
+        if (existingIdx >= 0) {
+          auctions[existingIdx] = { ...auctions[existingIdx], ...formatted };
+        } else {
+          auctions.push(formatted);
+        }
+      }
+    }
+  } catch (err) {
+    console.error('[DB] Live sync error:', err.message);
+  }
+}
+
 function publicAuction(item, user) {
   const realBids = bids.filter(bid => bid.auctionId === item.id);
   const recentBids = [...realBids, ...(item.sampleBids || [])]
@@ -259,11 +310,16 @@ async function api(req, res, url) {
     const user = { id: nextUserId++, name, email, role, status: 'Active', joinedAt: Date.now(), ...credentials };
     if (db.isConnected) {
       try {
+        const parts = name.split(' ');
+        const firstName = parts[0] || name;
+        const lastName = parts.slice(1).join(' ') || '';
         const [resDb] = await db.pool.execute(
-          'INSERT INTO users (name, email, password_hash, password_salt, role, status) VALUES (?, ?, ?, ?, ?, ?)',
-          [name, email, credentials.hash, credentials.salt, role, 'Active']
+          'INSERT INTO users (first_name, last_name, name, email, password_hash, password_salt, role, status) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+          [firstName, lastName, name, email, credentials.hash, credentials.salt, role, 'Active']
         );
         user.id = resDb.insertId;
+        // Seed initial phone entry into weak entity user_phone
+        await db.pool.execute('INSERT IGNORE INTO user_phone (user_id, phone_no) VALUES (?, ?)', [user.id, '+91-9820000000']);
       } catch (dbErr) {
         if (dbErr.code === 'ER_DUP_ENTRY') {
           return sendJson(res, 409, { error: 'An account already exists with that email.' });
@@ -323,6 +379,7 @@ async function api(req, res, url) {
   if (req.method === 'GET' && route === '/api/categories') return sendJson(res, 200, categories);
 
   if (req.method === 'GET' && route === '/api/auctions') {
+    await syncFromDatabase();
     const user = getUser(req);
     const category = url.searchParams.get('category');
     const query = (url.searchParams.get('q') || '').trim().toLowerCase();
@@ -350,6 +407,7 @@ async function api(req, res, url) {
   const auctionMatch = route.match(/^\/api\/auctions\/(\d+)(?:\/(bid|watchlist|payment))?$/);
   if (auctionMatch) {
     const [, rawId, action] = auctionMatch;
+    if (req.method === 'GET') await syncFromDatabase();
     const item = findAuction(rawId);
     if (!item || item.status === 'Cancelled') return sendJson(res, 404, { error: 'Auction not found.' });
     if (req.method === 'GET' && !action) return sendJson(res, 200, publicAuction(item, getUser(req)));
@@ -378,8 +436,8 @@ async function api(req, res, url) {
       if (db.isConnected) {
         try {
           await db.pool.execute(
-            'INSERT INTO bid (auction_id, bidder_id, amount, ip_address) VALUES (?, ?, ?, ?)',
-            [item.id, user.id, item.currentBid, req.socket.remoteAddress || '127.0.0.1']
+            'INSERT INTO bid (auction_id, bidder_id, bid_amount, amount, ip_address) VALUES (?, ?, ?, ?, ?)',
+            [item.id, user.id, item.currentBid, item.currentBid, req.socket.remoteAddress || '127.0.0.1']
           );
         } catch (dbErr) {
           if (dbErr.sqlState === '45000') {
@@ -402,7 +460,7 @@ async function api(req, res, url) {
       if (db.isConnected) {
         try {
           if (isSaving) {
-            await db.pool.execute('INSERT IGNORE INTO watchlist (user_id, auction_id) VALUES (?, ?)', [user.id, item.id]);
+            await db.pool.execute('INSERT IGNORE INTO watchlist (user_id, auction_id, added_at, created_at) VALUES (?, ?, NOW(), NOW())', [user.id, item.id]);
           } else {
             await db.pool.execute('DELETE FROM watchlist WHERE user_id = ? AND auction_id = ?', [user.id, item.id]);
           }
@@ -429,9 +487,9 @@ async function api(req, res, url) {
       if (db.isConnected) {
         try {
           await db.pool.execute(
-            `INSERT INTO payment (auction_id, payer_id, amount, payment_status, deadline_at, transaction_ref, paid_at)
-             VALUES (?, ?, ?, 'Paid', NOW() + INTERVAL 2 DAY, ?, NOW())
-             ON DUPLICATE KEY UPDATE payment_status = 'Paid', transaction_ref = VALUES(transaction_ref), paid_at = NOW()`,
+            `INSERT INTO payment (auction_id, payer_id, amount, payment_method, due_by, deadline_at, status, payment_status, transaction_ref, paid_at)
+             VALUES (?, ?, ?, 'Online Transfer / Escrow', NOW() + INTERVAL 2 DAY, NOW() + INTERVAL 2 DAY, 'Paid', 'Paid', ?, NOW())
+             ON DUPLICATE KEY UPDATE status = 'Paid', payment_status = 'Paid', transaction_ref = VALUES(transaction_ref), paid_at = NOW()`,
             [item.id, user.id, item.currentBid, item.payment.transactionRef]
           );
           await db.pool.execute(
@@ -451,6 +509,7 @@ async function api(req, res, url) {
   if (req.method === 'GET' && route === '/api/dashboard') {
     const user = authorize(req, res);
     if (!user) return;
+    await syncFromDatabase();
     const myBids = bids.filter(bid => bid.userId === user.id).map(bid => {
       const auction = findAuction(bid.auctionId);
       const allItemBids = bids.filter(b => b.auctionId === bid.auctionId).sort((a, b) => b.amount - a.amount || a.at - b.at);
@@ -489,12 +548,12 @@ async function api(req, res, url) {
         const [catRows] = await db.pool.execute('SELECT category_id FROM category WHERE name = ?', [item.category]);
         const catId = catRows.length > 0 ? catRows[0].category_id : 1;
         const [itemRes] = await db.pool.execute(
-          'INSERT INTO item (seller_id, category_id, title, condition_type, location, image_url, description) VALUES (?, ?, ?, ?, ?, ?, ?)',
-          [user.id, catId, item.title, item.condition, item.location, item.image, item.description]
+          'INSERT INTO item (seller_id, category_id, title, item_condition, condition_type, starting_price, location, image_url, description) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
+          [user.id, catId, item.title, item.condition, item.condition, item.startingPrice, item.location, item.image, item.description]
         );
         const [aucRes] = await db.pool.execute(
-          'INSERT INTO auction (item_id, starting_price, reserve_price, min_increment, current_bid, bid_count, status, start_time, end_time) VALUES (?, ?, ?, ?, ?, 0, ?, NOW(), ?)',
-          [itemRes.insertId, item.startingPrice, item.reservePrice, item.minIncrement, item.startingPrice, 'Active', new Date(item.endsAt)]
+          'INSERT INTO auction (item_id, starting_price, reserve_price, min_increment, current_bid, highest_bid, bid_count, status, start_time, end_time) VALUES (?, ?, ?, ?, ?, ?, 0, ?, NOW(), ?)',
+          [itemRes.insertId, item.startingPrice, item.reservePrice, item.minIncrement, item.startingPrice, item.startingPrice, 'Active', new Date(item.endsAt)]
         );
         auction.id = aucRes.insertId;
         await db.pool.execute(
@@ -664,8 +723,8 @@ function validateListing(body, res) {
     return null;
   }
   const image = String(body.image || '').trim();
-  if (image && !/^https:\/\/[^\s"'<>\\]+$/i.test(image)) {
-    sendJson(res, 400, { error: 'Image address must be a valid https:// URL without quotes or whitespace.' });
+  if (image && !/^(https:\/\/|assets\/)[^\s"'<>\\]+$/i.test(image)) {
+    sendJson(res, 400, { error: 'Image address must be a valid https:// URL or local asset path.' });
     return null;
   }
   return {
@@ -910,49 +969,7 @@ async function bootstrapAccounts() {
       }
 
       // Synchronize full auction catalog from MySQL
-      const [aucRows] = await db.pool.execute(`
-        SELECT 
-          a.auction_id as id, 
-          i.title, 
-          c.name as category, 
-          i.condition_type as \`condition\`, 
-          a.current_bid as currentBid, 
-          a.starting_price as startingPrice, 
-          a.reserve_price as reservePrice, 
-          a.min_increment as minIncrement, 
-          a.bid_count as bidCount, 
-          UNIX_TIMESTAMP(a.end_time)*1000 as endsAt, 
-          a.status, 
-          u.name as seller, 
-          i.seller_id as ownerId, 
-          a.winner_id as winnerId, 
-          i.location, 
-          i.image_url as image, 
-          i.description 
-        FROM auction a 
-        JOIN item i ON a.item_id = i.item_id 
-        JOIN category c ON i.category_id = c.category_id 
-        JOIN users u ON i.seller_id = u.user_id
-      `);
-      if (aucRows.length > 0) {
-        for (const row of aucRows) {
-          const formatted = {
-            ...row,
-            currentBid: Number(row.currentBid),
-            startingPrice: Number(row.startingPrice),
-            reservePrice: Number(row.reservePrice),
-            minIncrement: Number(row.minIncrement),
-            bidCount: Number(row.bidCount),
-            endsAt: Number(row.endsAt)
-          };
-          const existingIdx = auctions.findIndex(a => a.id === formatted.id);
-          if (existingIdx >= 0) {
-            auctions[existingIdx] = { ...auctions[existingIdx], ...formatted };
-          } else {
-            auctions.push(formatted);
-          }
-        }
-      }
+      await syncFromDatabase();
     } catch (err) {
       console.error('[DB] Align database error:', err.message);
     }

@@ -3301,6 +3301,12 @@ body {
   background-color: var(--_theme---brand-color-2);
 }
 
+.badge-square.gold {
+  border-radius: var(--radius--radius-xs);
+  background-color: #facc15;
+  color: #0B0E01;
+}
+
 .text {
   color: var(--content);
   text-transform: uppercase;
