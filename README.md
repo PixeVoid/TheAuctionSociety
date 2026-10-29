@@ -49,8 +49,8 @@ Open **MySQL Workbench**, click the **`+`** icon next to *MySQL Connections*, an
 | **Connection Method** | `Standard (TCP/IP)` |
 | **Hostname** | `127.0.0.1` *(or `localhost`)* |
 | **Port** | `3306` |
-| **Username** | `auction_user` *(or `root`)* |
-| **Password** | `AuctionPass123!` *(or root password `Ankitsql`)* |
+| **Username** | `auction` *(or `auction_user`, `root`)* |
+| **Password** | `AuctionPass123!` *(or `auction`)* |
 | **Default Schema** | `auction_society` |
 
 Click **Test Connection** — you will receive a green confirmation dialog: *"Successfully made the MySQL connection"*.
