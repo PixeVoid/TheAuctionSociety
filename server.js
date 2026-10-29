@@ -348,12 +348,67 @@ async function api(req, res, url) {
     const body = await parseBody(req, res);
     if (!body) return;
     const email = String(body.email || '').trim().toLowerCase();
-    const user = users.find(row => row.email === email);
+    let user = users.find(row => row.email === email);
+
+    // Look up directly in MySQL database if not already in memory
+    if (!user && db.isConnected) {
+      try {
+        const [dbUsers] = await db.pool.execute(
+          'SELECT user_id, first_name, last_name, name, email, password_hash, password_salt, role, status FROM users WHERE email = ?',
+          [email]
+        );
+        if (dbUsers.length > 0) {
+          const u = dbUsers[0];
+          user = {
+            id: u.user_id,
+            name: u.name,
+            email: u.email,
+            role: u.role,
+            status: u.status,
+            salt: u.password_salt || '00000000000000000000000000000000',
+            hash: u.password_hash,
+            joinedAt: Date.now()
+          };
+          users.push(user);
+          if (!watchlists.has(user.id)) watchlists.set(user.id, new Set());
+        }
+      } catch (err) {
+        console.error('[DB] Error querying user on login:', err.message);
+      }
+    }
+
     if (!user || user.status !== 'Active') return sendJson(res, 401, { error: 'Email or password is incorrect, or the account is blocked.' });
-    const attempt = await hashPassword(String(body.password || ''), Buffer.from(user.salt, 'hex'));
-    const a = Buffer.from(attempt.hash, 'hex');
-    const b = Buffer.from(user.hash || user.passwordHash, 'hex');
-    if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) return sendJson(res, 401, { error: 'Email or password is incorrect.' });
+
+    let isPasswordValid = false;
+    const rawInputPass = String(body.password || '');
+    const userHash = String(user.hash || user.passwordHash || '');
+    const userSalt = String(user.salt || user.passwordSalt || '');
+
+    // 1. Scrypt hash verification (standard)
+    try {
+      const attempt = await hashPassword(rawInputPass, Buffer.from(userSalt, 'hex'));
+      const a = Buffer.from(attempt.hash, 'hex');
+      const b = Buffer.from(userHash, 'hex');
+      if (a.length === b.length && crypto.timingSafeEqual(a, b)) {
+        isPasswordValid = true;
+      }
+    } catch {}
+
+    // 2. MySQL SHA2(pass, 256) or SHA2(pass, 512) support for SQL workbench inserts
+    if (!isPasswordValid) {
+      const sha256Hash = crypto.createHash('sha256').update(rawInputPass).digest('hex');
+      const sha512Hash = crypto.createHash('sha512').update(rawInputPass).digest('hex');
+      if (userHash.toLowerCase() === sha256Hash.toLowerCase() || userHash.toLowerCase() === sha512Hash.toLowerCase()) {
+        isPasswordValid = true;
+      }
+    }
+
+    // 3. Plaintext match fallback
+    if (!isPasswordValid && userHash === rawInputPass) {
+      isPasswordValid = true;
+    }
+
+    if (!isPasswordValid) return sendJson(res, 401, { error: 'Email or password is incorrect.' });
     createSession(res, user);
     addAudit(user, 'LOGIN', 'users', user.id);
     if (db.isConnected) {
