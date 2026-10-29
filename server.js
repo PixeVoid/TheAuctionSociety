@@ -830,7 +830,31 @@ function serveFile(req, res, url) {
     return sendJson(res, 403, { error: 'Forbidden.' });
   }
 
-  // 1. Check in-memory static cache (handles exact files & clean URLs)
+  // 1. Look up file on filesystem (always fresh in local development)
+  const filePath = findFilePath('/' + normalized);
+  if (filePath) {
+    const basename = path.basename(filePath).toLowerCase();
+    const ext = path.extname(filePath).toLowerCase();
+
+    // Protect sensitive files, hidden directories, node scripts, metadata
+    if (basename.startsWith('.') || BLOCKED_NAMES.has(basename) || ext === '.json' || ext === '.md' || ext === '.sql' || !ALLOWED_STATIC_EXTS.has(ext)) {
+      return sendJson(res, 404, { error: 'Page not found.' });
+    }
+
+    try {
+      const content = fs.readFileSync(filePath);
+      res.writeHead(200, {
+        'Content-Type': MIME[ext] || 'application/octet-stream',
+        'X-Content-Type-Options': 'nosniff',
+        'X-Frame-Options': 'SAMEORIGIN'
+      });
+      return res.end(content);
+    } catch {
+      // Fallback to cache if read fails
+    }
+  }
+
+  // 2. Fallback to in-memory static cache (handles bundled serverless environments)
   let cached = STATIC_CACHE.get(normalized);
   if (!cached && !path.extname(normalized)) {
     cached = STATIC_CACHE.get(`${normalized}.html`);
@@ -845,29 +869,7 @@ function serveFile(req, res, url) {
     return res.end(cached.content);
   }
 
-  // 2. Fallback to filesystem lookup
-  const filePath = findFilePath('/' + normalized);
-  if (!filePath) {
-    return sendJson(res, 404, { error: 'Page not found.' });
-  }
-
-  const basename = path.basename(filePath).toLowerCase();
-  const ext = path.extname(filePath).toLowerCase();
-
-  // Protect sensitive files, hidden directories, node scripts, metadata
-  if (basename.startsWith('.') || BLOCKED_NAMES.has(basename) || ext === '.json' || ext === '.md' || ext === '.sql' || !ALLOWED_STATIC_EXTS.has(ext)) {
-    return sendJson(res, 404, { error: 'Page not found.' });
-  }
-
-  fs.readFile(filePath, (error, content) => {
-    if (error) return sendJson(res, 404, { error: 'Page not found.' });
-    res.writeHead(200, {
-      'Content-Type': MIME[ext] || 'application/octet-stream',
-      'X-Content-Type-Options': 'nosniff',
-      'X-Frame-Options': 'SAMEORIGIN'
-    });
-    res.end(content);
-  });
+  return sendJson(res, 404, { error: 'Page not found.' });
 }
 
 async function bootstrapAccounts() {
