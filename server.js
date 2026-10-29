@@ -667,12 +667,31 @@ async function api(req, res, url) {
   if (req.method === 'GET' && route === '/api/admin/dashboard') {
     const admin = authorize(req, res, ['Admin']);
     if (!admin) return;
+
+    let dbAuditLogs = [];
+    if (db.isConnected) {
+      try {
+        const [rows] = await db.pool.execute(
+          'SELECT log_id, event_type, user_id, auction_id, summary, ip_address, created_at FROM audit_log ORDER BY log_id DESC LIMIT 80'
+        );
+        dbAuditLogs = rows.map(r => ({
+          id: r.log_id,
+          action: r.event_type,
+          summary: r.summary,
+          time: r.created_at,
+          actor: r.user_id ? `User #${r.user_id}` : 'System'
+        }));
+      } catch (err) {
+        console.error('[DB] Error querying audit_log:', err.message);
+      }
+    }
+
     return sendJson(res, 200, {
       user: safeUser(admin),
       users: users.map(safeUser),
       auctions: auctions.map(item => ({ id: item.id, title: item.title, category: item.category, status: item.status, seller: item.seller, currentBid: item.currentBid, bidCount: item.bidCount })),
       categories,
-      audit: auditLog.slice(0, 80)
+      audit: dbAuditLogs.length ? dbAuditLogs : auditLog.slice(0, 80)
     });
   }
 
