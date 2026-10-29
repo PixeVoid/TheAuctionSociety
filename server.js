@@ -318,8 +318,10 @@ async function api(req, res, url) {
           [firstName, lastName, name, email, credentials.hash, credentials.salt, role, 'Active']
         );
         user.id = resDb.insertId;
-        // Seed initial phone entry into weak entity user_phone
-        await db.pool.execute('INSERT IGNORE INTO user_phone (user_id, phone_no) VALUES (?, ?)', [user.id, '+91-9820000000']);
+        const phone = String(body.phone || '').trim();
+        if (phone) {
+          await db.pool.execute('INSERT IGNORE INTO user_phone (user_id, phone_no) VALUES (?, ?)', [user.id, phone]);
+        }
       } catch (dbErr) {
         if (dbErr.code === 'ER_DUP_ENTRY') {
           return sendJson(res, 409, { error: 'An account already exists with that email.' });

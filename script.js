@@ -519,6 +519,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
     const name = (document.getElementById('register-name') || document.getElementById('reg-name'))?.value.trim() || '';
     const email = (document.getElementById('register-email') || document.getElementById('reg-email'))?.value.trim() || '';
     const password = (document.getElementById('register-password') || document.getElementById('reg-password'))?.value || '';
+    const phone = document.getElementById('register-phone')?.value.trim() || '';
     const roleSelect = document.getElementById('register-role');
     const roleRadio = document.querySelector('input[name="role"]:checked');
     let role = roleSelect ? roleSelect.value : (roleRadio ? roleRadio.value : 'Buyer');
@@ -529,7 +530,7 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
       const res = await fetch('/api/auth/register', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name, email, password, role })
+        body: JSON.stringify({ name, email, password, role, phone })
       });
       const data = await res.json();
       if (!res.ok) {
