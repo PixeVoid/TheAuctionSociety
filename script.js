@@ -1074,31 +1074,6 @@ function initEventGalleryCarousel(e){function t(t){c&&c.kill(),e.querySelectorAl
     CONSTRAINT chk_auction_time CHECK (end_time > start_time),
     CONSTRAINT chk_auction_bid_count CHECK (bid_count >= 0)
 );`,
-          { name: 'start_time', type: 'DATETIME', constraints: 'NOT NULL', desc: 'Exact date and time bidding opens.' },
-          { name: 'end_time', type: 'DATETIME', constraints: 'NOT NULL, CHECK (end_time > start_time)', desc: 'Exact date and time bidding closes.' }
-        ],
-        ddl: `CREATE TABLE auction (
-    auction_id INT AUTO_INCREMENT,
-    item_id INT NOT NULL,
-    starting_price DECIMAL(12,2) NOT NULL,
-    reserve_price DECIMAL(12,2) NOT NULL,
-    min_increment DECIMAL(10,2) NOT NULL DEFAULT 100.00,
-    current_bid DECIMAL(12,2) NOT NULL DEFAULT 0.00,
-    bid_count INT NOT NULL DEFAULT 0,
-    winner_id INT NULL,
-    status VARCHAR(20) NOT NULL DEFAULT 'Active',
-    start_time DATETIME NOT NULL,
-    end_time DATETIME NOT NULL,
-    CONSTRAINT pk_auction PRIMARY KEY (auction_id),
-    CONSTRAINT uq_auction_item UNIQUE (item_id),
-    CONSTRAINT fk_auction_item FOREIGN KEY (item_id) REFERENCES item(item_id),
-    CONSTRAINT fk_auction_winner FOREIGN KEY (winner_id) REFERENCES users(user_id),
-    CONSTRAINT chk_auction_starting_price CHECK (starting_price > 0),
-    CONSTRAINT chk_auction_min_increment CHECK (min_increment > 0),
-    CONSTRAINT chk_auction_reserve CHECK (reserve_price >= starting_price),
-    CONSTRAINT chk_auction_status CHECK (status IN ('Active', 'Closed', 'Cancelled')),
-    CONSTRAINT chk_auction_time CHECK (end_time > start_time)
-);`,
         relations: [
           '1 : 1 with ITEM — One auction session per physical item consignment.',
           '1 : N with BID — One auction receives multiple competing bids (BID.auction_id → AUCTION.auction_id).',
